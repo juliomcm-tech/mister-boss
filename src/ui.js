@@ -58,7 +58,7 @@ function render() {
 function legRow(c, opts) {
   const o = opts || {};
   return `<div class="leg ${c.why ? 'cut' : ''}" style="grid-template-columns:auto 1fr auto">${mdot(c.M || MI[c.mi], 34)}
-    <div style="min-width:0"><div class="t"><span class="muted" style="font-weight:600">${hhmm(c.d)}${new Date(c.d).getHours() < DAY_CUT ? ' 🌙' : ''}</span> · ${esc(c.lb)}</div><div class="g">${esc(c.gl)} · ${esc(c.mkn || '')}${c.seg ? ' · ' + esc(segKey(c.seg)) : ''}</div>
+    <div style="min-width:0"><div class="t">${esc(c.lb)}</div><div class="small" style="font-weight:600;color:var(--blue)">${ic('clock')} ${dayLbl(c.d)} · ${hhmm(c.d)}${new Date(c.d).getHours() < DAY_CUT ? ' 🌙 madrugada' : ''}</div><div class="g">${esc(c.gl)} · ${esc(c.mkn || '')}${c.seg ? ' · ' + esc(segKey(c.seg)) : ''}</div>
     <div class="p">${esc((c.M || MI[c.mi]).n.replace('Mister ', ''))} ${pct(c.p)}${c.pb != null && Math.abs(c.pb - c.p) >= 0.005 ? ` → <b>Boss ${pct(c.pb)}</b>` : c.pb != null ? ' · Boss confirma' : ''}${c.why ? ` · <span class="neg">cortada: ${esc(c.why)}</span>` : ''}</div></div>
     <div class="o" style="text-align:right">${c.odd && !c.est ? odd2(c.odd) : '<span class="muted small">odd<br>Betano</span>'}</div></div>`;
 }
@@ -91,6 +91,7 @@ function viewInicio() {
   else {
     h += `<div class="pn hl">${pnH(`${ic('shield')} Boletim do Boss · ${dayName(DAY).toLowerCase()}`, slip.legs.length ? `promete ${pct(slip.p)}` : '')}`;
     if (slip.legs.length) h += ordSeg() + ordL(slip.legs).map(c => legRow(c)).join('') + `<div class="small muted" style="margin-top:8px">Só jogos de ${DAY === 0 ? 'hoje' : 'amanhã'}. 🌙 = começa de madrugada (até às 6h), ainda conta como esta noite. Cada seleção traz a probabilidade do Mister e a do Boss. Mete as odds da Betano na app do Mister para registar.</div>
+      <div class="small" style="margin-top:8px;color:var(--blue)">${ic('save')} Guardado automaticamente${SLIPS[Dd.k] ? ' às ' + hhmm(SLIPS[Dd.k].t) : ''}: fica congelado quando começa o 1.º jogo e é conferido sozinho.</div>
       <button class="btn go full" style="margin-top:10px" onclick="shareSlip()">${ic('share')} Partilhar o boletim</button>`;
     else h += `<div class="small muted">Nenhuma seleção de ${DAY === 0 ? 'hoje' : 'amanhã'} passa dos ${pct(CFG.minLeg)} depois do filtro, ou os Misters ainda não têm jogos para esse dia. ${last ? '' : 'Toca em ↻.'}</div>`;
     h += `</div>`;
@@ -103,7 +104,7 @@ function viewInicio() {
   return h;
 }
 function slipText(Dd) {
-  return `🧠 Boletim do Mister Boss · ${dayName(DAY)} ${dayDate(Dd.k)}\n` + ordL(Dd.S.legs).map((c, i) => `${i + 1}) ${hhmm(c.d)} · ${c.lb} (${c.gl}) · ${c.M.n} ${pct(c.p)} → Boss ${pct(c.pb)}`).join('\n') + `\nPromessa: ${pct(Dd.S.p)} · simulação, sem dinheiro real · +18`;
+  return `🧠 Boletim do Mister Boss · ${dayName(DAY)} ${dayDate(Dd.k)}\n` + ordL(Dd.S.legs).map((c, i) => `${i + 1}) ${dayLbl(c.d)} ${hhmm(c.d)} · ${c.lb} (${c.gl}) · ${c.M.n} ${pct(c.p)} → Boss ${pct(c.pb)}`).join('\n') + `\nPromessa: ${pct(Dd.S.p)} · simulação, sem dinheiro real · +18`;
 }
 /* imagem do boletim: vertical (1080 px), pronta para WhatsApp, Facebook e Instagram */
 async function slipImage(Dd) {
@@ -144,9 +145,9 @@ async function slipImage(Dd) {
     x.save(); x.shadowColor = 'rgba(0,0,0,.25)'; x.shadowBlur = 26; x.shadowOffsetY = 10; rr(50, y, W - 100, cardH, 30); x.fillStyle = '#fbfdfb'; x.fill(); x.restore();
     x.save(); rr(50, y, W - 100, cardH, 30); x.clip(); x.fillStyle = M.c; x.fillRect(50, y, 14, cardH); x.restore();
     x.fillStyle = M.c; x.beginPath(); x.arc(130, y + cardH / 2, 40, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = F(800, 30); x.textAlign = 'center'; x.fillText(M.ini, 130, y + cardH / 2 + 11); x.textAlign = 'left';
-    const tm = hhmm(c.d) + (new Date(c.d).getHours() < DAY_CUT ? ' 🌙' : ''); x.font = F(700, 24); const tw = x.measureText(tm).width + 28;
+    const tm = dayLbl(c.d) + ' · ' + hhmm(c.d) + (new Date(c.d).getHours() < DAY_CUT ? ' 🌙' : ''); x.font = F(700, 24); const tw = x.measureText(tm).width + 28;
     rr(196, y + 26, tw, 40, 20); x.fillStyle = '#164f30'; x.fill(); x.fillStyle = '#fff'; x.fillText(tm, 210, y + 54);
-    x.fillStyle = '#647a6d'; x.font = F(600, 22); x.fillText(fit(M.s.toUpperCase(), 520 - tw, F(600, 22)), 196 + tw + 14, y + 54);
+    x.fillStyle = '#647a6d'; x.font = F(600, 22); x.fillText(fit(M.s.toUpperCase(), 600 - tw, F(600, 22)), 196 + tw + 14, y + 54);
     x.fillStyle = '#10241a'; x.fillText(fit(c.lb, 560, F(700, 36)), 196, y + 103);
     x.fillStyle = '#7d9186'; x.fillText(fit(c.gl, 560, F(400, 24)), 196, y + 134);
     x.textAlign = 'right'; x.fillStyle = '#1e8a4a'; x.font = F(800, 56); x.fillText(pct(pb), W - 84, y + 86); x.textAlign = 'left';
@@ -181,7 +182,7 @@ function viewSel() {
   if (!C.length) return h + `<div class="pn small muted">Sem seleções de 80%+ para ${DAY === 0 ? 'hoje' : 'amanhã'}${MF === 'all' ? '' : ' neste Mister'}. ${LS.get('last', 0) ? '' : 'Toca em ↻ para pôr os Misters a trabalhar.'}</div>`;
   const ok = ordL(C.filter(c => !c.why)), cut = ordL(C.filter(c => c.why));
   h += ordSeg();
-  h += `<div class="pn">${pnH(`${ic('check')} Passam no filtro · ${dayName(DAY).toLowerCase()}`, ok.length + '')}${ok.map(c => legRow(c) + (inSlip.has(c.mi + '|' + c.id) ? '<div class="small pos" style="margin:-4px 0 6px 46px">no Boletim do Boss</div>' : '')).join('') || '<div class="small muted">Nenhuma.</div>'}</div>`;
+  h += `<div class="pn">${pnH(`${ic('check')} Passam no filtro · ${dayName(DAY).toLowerCase()}`, ok.length + '')}${ok.map(c => legRow(c) + (inSlip.has(c.mi + '|' + c.id) ? `<div class="small pos" style="margin:-4px 0 8px 46px">${ic('check')} no Boletim do Boss</div>` : c.out ? `<div class="small muted" style="margin:-4px 0 8px 46px">fora do boletim: ${esc(c.out)}</div>` : '')).join('') || '<div class="small muted">Nenhuma.</div>'}</div>`;
   if (cut.length) h += `<div class="pn">${pnH(`${ic('filter')} Cortadas pelo Boss`, cut.length + '')}${cut.map(c => legRow(c)).join('')}</div>`;
   return h + `<div class="small muted" style="margin:6px 4px">«Boss X%» = a probabilidade do Mister corrigida pelo que ele acertou até hoje nesse tipo de aposta e nessa liga. 🌙 = começa de madrugada (até às 6h) e conta como a noite anterior.</div>`;
 }
@@ -198,7 +199,9 @@ function viewStats() {
   if (SM === 'boss') {
     h += `<div class="pn hl">${pnH(`${ic('shield')} Boletins do Boss`, B.slips ? B.slips + ' decididos' : '')}
       ${B.slips ? attr('Boletins inteiros certos', B.won / B.slips * 100, 'var(--c-blue)', `${B.won}/${B.slips} · prometia ${pct(B.prom)}`) : '<div class="small muted">Ainda nenhum boletim decidido. O Boss guarda o boletim de cada dia antes do 1.º jogo.</div>'}
-      ${B.legs ? attr('Seleções certas', B.legW / B.legs * 100, 'var(--c-green)', `${B.legW}/${B.legs} · prometia ${pct(B.legP)}`) : ''}</div>
+      ${B.legs ? attr('Seleções certas', B.legW / B.legs * 100, 'var(--c-green)', `${B.legW}/${B.legs} · prometia ${pct(B.legP)}`) : ''}
+      <div class="why"><span>Arquivo do Boss (seleções decididas guardadas)</span><b>${archCount()}</b></div>
+      <div class="why"><span>Boletins guardados</span><b>${Object.keys(SLIPS).length}</b></div></div>
       <div class="pn">${pnH(`${ic('filter')} O filtro tinha razão?`, B.cuts ? B.cuts + ' cortes decididos' : '')}
       ${B.cuts ? `${attr('Cortadas que falharam mesmo', B.cutLost / B.cuts * 100, 'var(--c-red)', `${B.cutLost}/${B.cuts}`)}<div class="small muted">Os Misters davam-lhes ${pct(B.cutP)} em média; ${B.cutLost / B.cuts > 1 - B.cutP ? '<b class="pos">falharam mais do que isso: o corte ajudou.</b>' : 'falharam menos do que isso: por agora o corte não ajudou (precisa de mais resultados).'}</div>` : '<div class="small muted">Quando houver cortes decididos, mostro se o Boss tinha razão em cortá-los.</div>'}</div>`;
     h += `<div class="pn">${pnH(`${ic('users')} Cada Mister (seleções de 80%+)`, '')}${MISTERS.map(M => { const s = S.F[M.k] ? misterStats(S.F, M.k) : null; return `<div class="mrow" onclick="SM='${M.k}';render()">${mdot(M)}<div style="flex:1;min-width:0"><b>${esc(M.n)}</b><div class="small muted">${esc(M.s)}</div></div><div style="text-align:right">${s && s.n ? `<b>${pct(s.hit)}</b> <span class="small muted">de ${s.n}</span><div class="small gap ${gapCls(s.gap)}">prometia ${pct(s.prom)}</div>` : '<span class="small muted">sem dados</span>'}</div></div>`; }).join('')}</div>`;

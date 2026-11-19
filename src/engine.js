@@ -7,7 +7,7 @@
    «Boletim do Boss» com o melhor do dia de todos os desportos.
    Não mexe em nenhum Mister: só lê o que eles guardam.
    ===================================================================== */
-const APP_VER = '1.2.0';
+const APP_VER = '1.3.0';
 
 /* ---------- utilitários ---------- */
 const $ = s => document.querySelector(s);
@@ -73,12 +73,30 @@ function zeFeed() {
   });
   return { app: 'ze', name: 'Mister Zé', sport: 'Futebol', t: tmax, legs };
 }
-/* ---------- ler as fichas ---------- */
+/* ---------- ler as fichas + o arquivo do Boss ---------- */
 function feeds() {
   const out = {};
   MISTERS.forEach(M => { const F = M.k === 'ze' ? zeFeed() : RAW(M.k + '_boss'); if (F && F.legs) out[M.k] = F; });
-  return out;
+  return archive(out);
 }
+/* o Boss guarda no seu arquivo cada seleção já decidida (até 3000): assim as estatísticas não se perdem quando
+   um Mister limpa a ficha dele, e ficam a crescer com o tempo */
+function archive(F) {
+  const H = LS.get('hist', {}); let ch = false;
+  Object.entries(F).forEach(([mi, f]) => Object.values(f.legs).forEach(l => {
+    if (l.st === 'open') return; const k = mi + '|' + l.id;
+    if (!H[k]) { H[k] = { mi, id: l.id, p: l.p, st: l.st, mkn: l.mkn, seg: l.seg, d: l.d, val: l.val != null ? l.val : undefined, z: l.safeZe ? 1 : undefined }; ch = true; }
+  }));
+  const ks = Object.keys(H); if (ks.length > 3000) { ks.sort((a, b) => H[a].d < H[b].d ? -1 : 1).slice(0, ks.length - 3000).forEach(k => delete H[k]); ch = true; }
+  if (ch) LS.set('hist', H);
+  Object.values(H).forEach(h => {
+    if (!MI[h.mi]) return;
+    const f = F[h.mi] || (F[h.mi] = { app: h.mi, name: MI[h.mi].n, t: 0, legs: {}, arch: true });
+    if (!f.legs[h.id]) f.legs[h.id] = { id: h.id, p: h.p, st: h.st, mkn: h.mkn, seg: h.seg, d: h.d, val: h.val, safeZe: h.z, lb: '', gl: '', arch: 1 };
+  });
+  return F;
+}
+const archCount = () => Object.keys(LS.get('hist', {})).length;
 const segKey = s => !s ? '—' : [s.lg, s.cat].filter(Boolean).join(' · ');
 const graded = l => l.st === 'won' || l.st === 'lost';
 
@@ -129,9 +147,11 @@ function dayCands(F, G, key) {
 function buildSlip(C) {
   const byGame = {}, per = {}, legs = []; let P = 1;
   C.filter(c => !c.why).forEach(c => {
-    const gk = c.mi + '|' + c.g; if (byGame[gk]) return;
-    if ((per[c.mi] || 0) >= CFG.perMister || legs.length >= CFG.maxLegs) return;
-    const q = c.pb - 0.01; if (legs.length && P * q < CFG.target) return;
+    c.out = null;
+    const gk = c.mi + '|' + c.g; if (byGame[gk]) { c.out = 'já há outra seleção deste jogo no boletim'; return; }
+    if ((per[c.mi] || 0) >= CFG.perMister) { c.out = `já há ${CFG.perMister} do ${MI[c.mi].n} (para não depender só de um)`; return; }
+    if (legs.length >= CFG.maxLegs) { c.out = `o boletim já tem ${CFG.maxLegs} seleções`; return; }
+    const q = c.pb - 0.01; if (legs.length && P * q < CFG.target) { c.out = `juntá-la baixava a promessa para ${pct(P * q)} (mínimo ${pct(CFG.target)})`; return; }
     byGame[gk] = 1; per[c.mi] = (per[c.mi] || 0) + 1; legs.push(c); P *= q;
   });
   return { legs, p: legs.length ? P : 0 };
