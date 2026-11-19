@@ -33,12 +33,16 @@ const gapCls = g => g == null ? 'muted' : g >= -0.02 ? 'pos' : g >= -0.06 ? '' :
 
 const VIEWS = ['inicio', 'jogos', 'stats', 'misters', 'mais'];
 let VIEW = (location.hash || '#inicio').slice(1); if (!VIEWS.includes(VIEW)) VIEW = 'inicio';
-let MF = 'all';
+let MF = 'all', DAY = 0, ORD = LS.get('ord', 'hora');
+const ordL = L => L.slice().sort(ORD === 'hora' ? ((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : b.pb - a.pb) : ((a, b) => (b.pb != null ? b.pb : b.p) - (a.pb != null ? a.pb : a.p)));
+const ordSeg = () => `<div class="seg" style="margin:4px 0 8px">${[['hora', 'Por hora'], ['pct', 'Por %']].map(([k, t]) => `<button class="${ORD === k ? 'on' : ''}" onclick="ORD='${k}';LS.set('ord','${k}');render()">${ic(k === 'hora' ? 'clock' : 'chart')} ${t}</button>`).join('')}</div>`;
+const dayTabs = () => `<div class="dates" style="margin-top:14px">${[-1, 0, 1].map(o => `<button class="${DAY === o ? 'on' : ''}" onclick="DAY=${o};render()"><b>${dayName(o)}</b><small>${dayDate(dayKey(o))}</small></button>`).join('')}</div>`;
+const dayData = off => off === -1 ? null : STATE.D[off];
 function go(v) { VIEW = v; history.replaceState(null, '', '#' + v); render(); window.scrollTo(0, 0); }
 function setUpd(t) { const e = $('#upd'); if (e) e.textContent = t; }
 function renderTop() {
   const S = STATE || compute(), on = Object.keys(S.F).length;
-  $('#chips').innerHTML = MISTERS.map(M => { const f = S.F[M.k]; return `<span class="st" style="${f ? '' : 'opacity:.45'}" onclick="go('misters')">${esc(M.ini)} ${f ? (Object.values(f.legs).filter(l => l.st === 'open').length) : '—'}</span>`; }).join('');
+  $('#chips').innerHTML = MISTERS.map(M => { const f = S.F[M.k]; return `<span class="st" style="${f ? '' : 'opacity:.45'}" onclick="go('misters')">${esc(M.ini)} ${f ? S.D[0].C.filter(c => c.mi === M.k).length : '—'}</span>`; }).join('');
   const last = LS.get('last', 0);
   setUpd(`${on} de ${MISTERS.length} Misters com dados · ${last ? 'atualizado ' + ago(last) : 'toca em ↻ para atualizar todos'}`);
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === VIEW));
@@ -54,48 +58,67 @@ function render() {
 function legRow(c, opts) {
   const o = opts || {};
   return `<div class="leg ${c.why ? 'cut' : ''}" style="grid-template-columns:auto 1fr auto">${mdot(c.M || MI[c.mi], 34)}
-    <div style="min-width:0"><div class="t">${esc(c.lb)}</div><div class="g">${esc(c.gl)} · ${dayLbl(c.d)} ${hhmm(c.d)} · ${esc(c.mkn || '')}${c.seg ? ' · ' + esc(segKey(c.seg)) : ''}</div>
+    <div style="min-width:0"><div class="t"><span class="muted" style="font-weight:600">${hhmm(c.d)}${new Date(c.d).getHours() < DAY_CUT ? ' 🌙' : ''}</span> · ${esc(c.lb)}</div><div class="g">${esc(c.gl)} · ${esc(c.mkn || '')}${c.seg ? ' · ' + esc(segKey(c.seg)) : ''}</div>
     <div class="p">${esc((c.M || MI[c.mi]).n.replace('Mister ', ''))} ${pct(c.p)}${c.pb != null && Math.abs(c.pb - c.p) >= 0.005 ? ` → <b>Boss ${pct(c.pb)}</b>` : c.pb != null ? ' · Boss confirma' : ''}${c.why ? ` · <span class="neg">cortada: ${esc(c.why)}</span>` : ''}</div></div>
     <div class="o" style="text-align:right">${c.odd && !c.est ? odd2(c.odd) : '<span class="muted small">odd<br>Betano</span>'}</div></div>`;
 }
+function pastSlip(k) {
+  const Y = SLIPS[k]; if (!Y) return `<div class="pn small muted">O Boss não guardou boletim para ${dayDate(k)} (só guarda quando o ↻ é feito antes dos jogos).</div>`;
+  const r = slipResult(STATE.F, Y);
+  return `<div class="pn hl">${pnH(`${ic('shield')} Boletim do Boss · ${dayDate(k)}`, r.st === 'won' ? '<b class="pos">ganhou</b>' : r.st === 'lost' ? '<b class="neg">perdeu</b>' : 'em curso')}${Y.legs.map(l => `<div class="why"><span>${l.st === 'won' ? `<span class="pos">${ic('check')}</span>` : l.st === 'lost' ? `<span class="neg">${ic('x')}</span>` : '<span class="muted">…</span>'} ${mchip(MI[l.mi])} ${esc(l.lb)} <span class="muted small">${esc(l.gl)}</span></span><b class="muted">${pct(l.pb)}</b></div>`).join('')}<div class="small muted" style="margin-top:6px">Prometia ${pct(Y.p)} · ${r.w}/${r.n} seleções certas até agora</div></div>`;
+}
 function viewInicio() {
-  const S = STATE, ns = Object.keys(S.F).length, slip = S.S, last = LS.get('last', 0);
-  const y = ymd(Date.now() - 864e5), Y = SLIPS[y], Yr = Y ? slipResult(S.F, Y) : null, B = bossStats(S.F);
-  let h = `<div class="pn hero"><span class="tag">o filtro final</span>
-    <div class="big">${slip.legs.length ? `${slip.legs.length} <b>seleç${slip.legs.length === 1 ? 'ão' : 'ões'}</b>` : 'Mister <b>Boss</b>'}</div>
-    <div class="sub">${!ns ? 'Ainda não vejo nenhum Mister neste telemóvel. Toca em ↻ e eu ponho-os a trabalhar.' : slip.legs.length ? `O melhor de hoje de ${new Set(slip.legs.map(l => l.mi)).size} Mister${new Set(slip.legs.map(l => l.mi)).size === 1 ? '' : 's'}, já filtrado. Promessa honesta: <b>${pct(slip.p)}</b>.` : 'Hoje nada passa no meu filtro. Às vezes o melhor boletim é não ter boletim.'}</div>
+  const S = STATE, ns = Object.keys(S.F).length, last = LS.get('last', 0), B = bossStats(S.F);
+  const Dd = dayData(DAY), slip = Dd ? Dd.S : { legs: [], p: 0 }, Yk = dayKey(-1), Y = SLIPS[Yk], Yr = Y ? slipResult(S.F, Y) : null;
+  const nM = new Set(slip.legs.map(l => l.mi)).size;
+  let h = dayTabs();
+  h += `<div class="pn hero"><span class="tag">${dayName(DAY)} · ${dayDate(dayKey(DAY))}</span>
+    <div class="big">${DAY === -1 ? (Y ? `${Yr.w}/${Yr.n} <b>certas</b>` : 'Mister <b>Boss</b>') : slip.legs.length ? `${slip.legs.length} <b>seleç${slip.legs.length === 1 ? 'ão' : 'ões'}</b>` : 'Mister <b>Boss</b>'}</div>
+    <div class="sub">${!ns ? 'Ainda não vejo nenhum Mister neste telemóvel. Toca em ↻ e eu ponho-os a trabalhar.' : DAY === -1 ? (Y ? (Yr.st === 'won' ? 'O boletim de ontem ganhou.' : Yr.st === 'lost' ? 'O boletim de ontem perdeu.' : 'O boletim de ontem ainda tem jogos por decidir.') : 'Sem boletim guardado para ontem.') : slip.legs.length ? `O melhor de ${DAY === 0 ? 'hoje' : 'amanhã'} de ${nM} Mister${nM === 1 ? '' : 's'}, já filtrado. Promessa honesta: <b>${pct(slip.p)}</b>.` : `${DAY === 0 ? 'Hoje' : 'Amanhã'} nada passa no meu filtro${DAY === 1 ? ' (ainda: os Misters juntam mais jogos ao longo do dia)' : ''}. Às vezes o melhor boletim é não ter boletim.`}</div>
     <div class="face">${bossFace(Yr ? (Yr.st === 'won' ? 'win' : Yr.st === 'lost' ? 'sad' : 'ok') : 'ok')}</div>
     <div class="kpis" style="margin-top:14px"><div class="kpi"><small>ontem</small><b>${Yr ? (Yr.st === 'won' ? '<span class="pos">✓</span>' : Yr.st === 'lost' ? '<span class="neg">✗</span>' : '…') : '—'}</b></div>
       <div class="kpi"><small>boletins</small><b>${B.slips ? B.won + '/' + B.slips : '—'}</b></div><div class="kpi"><small>Misters</small><b>${ns}/${MISTERS.length}</b></div></div></div>`;
   h += installBanner();
-  if (!ns) return h + `<div class="pn empty"><div class="face">${bossFace('ok')}</div><div class="pn-h" style="justify-content:center">Olá! Sou o Mister Boss.</div><div class="small muted" style="margin:6px 0 14px">Não analiso jogos: analiso <b>os Misters</b>. Junto o trabalho do Tó, Vi, Gi, Lu, Ko e Zé, vejo onde cada um acerta e onde falha, e fico com o melhor do dia.</div><button class="btn fill" onclick="refreshAll()">${ic('refresh')} Pôr os Misters a trabalhar</button><div class="small muted" style="margin-top:12px">Simulação: sem dinheiro real e sem ligação à Betano. +18 · Joga com responsabilidade.</div></div>`;
-  h += `<div class="pn hl">${pnH(`${ic('shield')} Boletim do Boss`, slip.legs.length ? `promete ${pct(slip.p)}` : '')}`;
-  if (slip.legs.length) {
-    h += slip.legs.map(c => legRow(c)).join('') + `<div class="small muted" style="margin-top:8px">Cada seleção vem do Mister que a fez, com a probabilidade dele e a do Boss (corrigida pela história desse Mister nesse tipo de aposta e nessa liga). Desportos diferentes não se influenciam, por isso juntá-los é seguro nas contas. Mete as odds da Betano na app do Mister para registar.</div>
+  if (!ns) return h + `<div class="pn empty"><div class="face">${bossFace('ok')}</div><div class="pn-h" style="justify-content:center">Olá! Sou o Mister Boss.</div><div class="small muted" style="margin:6px 0 14px">Não analiso jogos: analiso <b>os Misters</b>. Junto o trabalho do Tó, Vi, Gi, Lu, Ko e Zé, vejo onde cada um acerta e onde falha, e fico com o melhor de cada dia.</div><button class="btn fill" onclick="refreshAll()">${ic('refresh')} Pôr os Misters a trabalhar</button><div class="small muted" style="margin-top:12px">Simulação: sem dinheiro real e sem ligação à Betano. +18 · Joga com responsabilidade.</div></div>`;
+  if (DAY === -1) {
+    h += pastSlip(Yk);
+    const fb = feedback(S.F).slice(0, 3);
+    if (fb.length) h += `<div class="pn">${pnH(`${ic('bulb')} O Boss reparou`, '')}${fb.map(fbRow).join('')}<button class="btn full" style="margin-top:8px" onclick="go('misters')">Ver o feedback completo</button></div>`;
+    return h;
+  }
+  const saved = SLIPS[Dd.k], locked = saved && saved.legs.some(l => new Date(l.d).getTime() <= Date.now());
+  if (locked) h += pastSlip(Dd.k);
+  else {
+    h += `<div class="pn hl">${pnH(`${ic('shield')} Boletim do Boss · ${dayName(DAY).toLowerCase()}`, slip.legs.length ? `promete ${pct(slip.p)}` : '')}`;
+    if (slip.legs.length) h += ordSeg() + ordL(slip.legs).map(c => legRow(c)).join('') + `<div class="small muted" style="margin-top:8px">Só jogos de ${DAY === 0 ? 'hoje' : 'amanhã'}. 🌙 = começa de madrugada (até às 6h), ainda conta como esta noite. Cada seleção traz a probabilidade do Mister e a do Boss. Mete as odds da Betano na app do Mister para registar.</div>
       <button class="btn go full" style="margin-top:10px" onclick="shareSlip()">${ic('share')} Partilhar o boletim</button>`;
-  } else h += `<div class="small muted">Nenhuma seleção passa dos ${pct(CFG.minLeg)} depois do filtro, ou os Misters ainda não têm jogos para hoje. ${last ? '' : 'Toca em ↻.'}</div>`;
-  h += `</div>`;
-  const cut = S.C.filter(c => c.why);
-  if (cut.length) h += `<div class="pn">${pnH(`${ic('filter')} O que o Boss cortou hoje`, cut.length + '')}${cut.slice(0, 6).map(c => legRow(c)).join('')}${cut.length > 6 ? `<button class="btn full" onclick="go('jogos')">Ver todas</button>` : ''}</div>`;
-  if (Y) h += `<div class="pn">${pnH(`${ic('check')} Boletim de ontem`, Yr.st === 'won' ? '<b class="pos">ganhou</b>' : Yr.st === 'lost' ? '<b class="neg">perdeu</b>' : 'em curso')}${Y.legs.map(l => `<div class="why"><span>${l.st === 'won' ? `<span class="pos">${ic('check')}</span>` : l.st === 'lost' ? `<span class="neg">${ic('x')}</span>` : '<span class="muted">…</span>'} ${mchip(MI[l.mi])} ${esc(l.lb)}</span><b class="muted">${pct(l.pb)}</b></div>`).join('')}</div>`;
+    else h += `<div class="small muted">Nenhuma seleção de ${DAY === 0 ? 'hoje' : 'amanhã'} passa dos ${pct(CFG.minLeg)} depois do filtro, ou os Misters ainda não têm jogos para esse dia. ${last ? '' : 'Toca em ↻.'}</div>`;
+    h += `</div>`;
+  }
+  const cut = Dd.C.filter(c => c.why);
+  if (cut.length) h += `<div class="pn">${pnH(`${ic('filter')} O que o Boss cortou`, cut.length + '')}${ordL(cut).slice(0, 5).map(c => legRow(c)).join('')}${cut.length > 5 ? `<button class="btn full" onclick="go('jogos')">Ver todas</button>` : ''}</div>`;
+  if (DAY === 0 && Y) h += pastSlip(Yk);
   const fb = feedback(S.F).slice(0, 3);
   if (fb.length) h += `<div class="pn">${pnH(`${ic('bulb')} O Boss reparou`, '')}${fb.map(fbRow).join('')}<button class="btn full" style="margin-top:8px" onclick="go('misters')">Ver o feedback completo</button></div>`;
   return h;
 }
 function shareSlip() {
-  const S = STATE.S; if (!S.legs.length) return;
-  const txt = `🧠 Boletim do Mister Boss · ${new Date().toLocaleDateString('pt-PT')}\n` + S.legs.map((c, i) => `${i + 1}) ${c.lb} (${c.gl}) · ${c.M.n} ${pct(c.p)} → Boss ${pct(c.pb)}`).join('\n') + `\nPromessa: ${pct(S.p)} · simulação, sem dinheiro real`;
+  const Dd = dayData(DAY), S = Dd && Dd.S; if (!S || !S.legs.length) return;
+  const txt = `🧠 Boletim do Mister Boss · ${dayName(DAY)} ${dayDate(Dd.k)}\n` + S.legs.map((c, i) => `${i + 1}) ${c.lb} (${c.gl}) · ${c.M.n} ${pct(c.p)} → Boss ${pct(c.pb)}`).join('\n') + `\nPromessa: ${pct(S.p)} · simulação, sem dinheiro real`;
   (async () => { try { if (navigator.share) return await navigator.share({ text: txt }); } catch (e) { if (e && e.name === 'AbortError') return; } try { await navigator.clipboard.writeText(txt); toast('Copiado!'); } catch (e) { window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank'); } })();
 }
 /* ---------- SELEÇÕES: tudo o que os Misters propõem hoje ---------- */
 function viewSel() {
-  const S = STATE, C = S.C.filter(c => MF === 'all' || c.mi === MF), inSlip = new Set(S.S.legs.map(c => c.mi + '|' + c.id));
-  let h = `<div class="dates" style="margin-top:14px"><button class="${MF === 'all' ? 'on' : ''}" onclick="MF='all';render()"><b>Todos</b><small>${S.C.length}</small></button>${MISTERS.map(M => `<button class="${MF === M.k ? 'on' : ''}" onclick="MF='${M.k}';render()"><b>${esc(M.ini)}</b><small>${S.C.filter(c => c.mi === M.k).length}</small></button>`).join('')}</div>`;
-  if (!C.length) return h + `<div class="pn small muted">Sem seleções de 80%+ para as próximas 36 horas${MF === 'all' ? '' : ' neste Mister'}. ${LS.get('last', 0) ? '' : 'Toca em ↻ para pôr os Misters a trabalhar.'}</div>`;
-  const ok = C.filter(c => !c.why), cut = C.filter(c => c.why);
-  h += `<div class="pn">${pnH(`${ic('check')} Passam no filtro`, ok.length + '')}${ok.map(c => legRow(c) + (inSlip.has(c.mi + '|' + c.id) ? '<div class="small pos" style="margin:-4px 0 6px 46px">no Boletim do Boss</div>' : '')).join('') || '<div class="small muted">Nenhuma.</div>'}</div>`;
+  if (DAY === -1) DAY = 0;
+  const Dd = dayData(DAY), C = Dd.C.filter(c => MF === 'all' || c.mi === MF), inSlip = new Set(Dd.S.legs.map(c => c.mi + '|' + c.id));
+  let h = `<div class="dates" style="margin-top:14px">${[0, 1].map(o => `<button class="${DAY === o ? 'on' : ''}" onclick="DAY=${o};render()"><b>${dayName(o)}</b><small>${dayDate(dayKey(o))} · ${STATE.D[o].C.length}</small></button>`).join('')}</div>
+    <div class="dates" style="margin-top:6px"><button class="${MF === 'all' ? 'on' : ''}" onclick="MF='all';render()"><b>Todos</b><small>${Dd.C.length}</small></button>${MISTERS.map(M => `<button class="${MF === M.k ? 'on' : ''}" onclick="MF='${M.k}';render()"><b>${esc(M.ini)}</b><small>${Dd.C.filter(c => c.mi === M.k).length}</small></button>`).join('')}</div>`;
+  if (!C.length) return h + `<div class="pn small muted">Sem seleções de 80%+ para ${DAY === 0 ? 'hoje' : 'amanhã'}${MF === 'all' ? '' : ' neste Mister'}. ${LS.get('last', 0) ? '' : 'Toca em ↻ para pôr os Misters a trabalhar.'}</div>`;
+  const ok = ordL(C.filter(c => !c.why)), cut = ordL(C.filter(c => c.why));
+  h += ordSeg();
+  h += `<div class="pn">${pnH(`${ic('check')} Passam no filtro · ${dayName(DAY).toLowerCase()}`, ok.length + '')}${ok.map(c => legRow(c) + (inSlip.has(c.mi + '|' + c.id) ? '<div class="small pos" style="margin:-4px 0 6px 46px">no Boletim do Boss</div>' : '')).join('') || '<div class="small muted">Nenhuma.</div>'}</div>`;
   if (cut.length) h += `<div class="pn">${pnH(`${ic('filter')} Cortadas pelo Boss`, cut.length + '')}${cut.map(c => legRow(c)).join('')}</div>`;
-  return h + `<div class="small muted" style="margin:6px 4px">«Boss X%» = a probabilidade do Mister corrigida pelo que ele acertou até hoje nesse tipo de aposta e nessa liga. Sem resultados suficientes, o Boss confia no Mister.</div>`;
+  return h + `<div class="small muted" style="margin:6px 4px">«Boss X%» = a probabilidade do Mister corrigida pelo que ele acertou até hoje nesse tipo de aposta e nessa liga. 🌙 = começa de madrugada (até às 6h) e conta como a noite anterior.</div>`;
 }
 /* ---------- ESTATÍSTICAS ---------- */
 function calTable(o, title) {

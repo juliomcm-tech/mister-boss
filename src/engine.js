@@ -7,7 +7,7 @@
    «Boletim do Boss» com o melhor do dia de todos os desportos.
    Não mexe em nenhum Mister: só lê o que eles guardam.
    ===================================================================== */
-const APP_VER = '1.0.0';
+const APP_VER = '1.1.0';
 
 /* ---------- utilitários ---------- */
 const $ = s => document.querySelector(s);
@@ -28,6 +28,11 @@ function toast(msg, ms) { const t = $('#toast'); if (!t) return; t.innerHTML = m
 const hhmm = iso => new Date(iso).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
 const dayLbl = iso => new Date(iso).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
 const ymd = d => { const x = new Date(d); return x.getFullYear() + String(x.getMonth() + 1).padStart(2, '0') + String(x.getDate()).padStart(2, '0'); };
+const DAY_CUT = 6;   // jogos entre as 00:00 e as 05:59 (NBA, NHL, NFL, UFC à noite) contam para o dia anterior
+const dayOf = iso => ymd(new Date(iso).getTime() - DAY_CUT * 3600e3);
+const dayKey = off => ymd(Date.now() - DAY_CUT * 3600e3 + (off || 0) * 864e5);
+const dayName = off => off === 0 ? 'Hoje' : off === 1 ? 'Amanhã' : off === -1 ? 'Ontem' : '';
+const dayDate = k => new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8), 12).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', '');
 const ago = t => { if (!t) return 'nunca'; const m = Math.round((Date.now() - t) / 60000); return m < 60 ? `há ${m} min` : m < 48 * 60 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} dias`; };
 
 /* ---------- os Misters (todos no mesmo site: juliomcm-tech.github.io/…) ---------- */
@@ -106,14 +111,14 @@ function judge(G, mk, l) {
   const weak = fine && fine.n >= WEAK_N && fine.w / fine.n < fine.P / fine.n - WEAK_GAP;
   return { r, n: g.n, lvl: used ? used.k.split('|').length : 0, weak, pb: Math.min(0.985, l.p * r) };
 }
-/* candidatos de hoje: seleções por decidir que começam nas próximas 36 horas */
-function todayCands(F, G) {
+/* candidatos de um dia: seleções por decidir desse dia (que ainda não começaram) */
+function dayCands(F, G, key) {
   const now = Date.now(), out = [];
   Object.entries(F).forEach(([mk, f]) => {
     if (CFG.off[mk]) return;
     Object.values(f.legs).forEach(l => {
       if (l.st !== 'open' || l.safeZe) return;
-      const t0 = new Date(l.d).getTime(); if (!(t0 > now + 10 * 60e3 && t0 < now + 36 * 3600e3)) return;
+      const t0 = new Date(l.d).getTime(); if (!(t0 > now + 10 * 60e3) || dayOf(l.d) !== key) return;
       const J = judge(G, mk, l);
       out.push(Object.assign({}, l, J, { mi: mk, M: MI[mk], why: J.weak ? 'zona fraca: este Mister falha aqui mais do que promete' : J.pb < CFG.minLeg ? `abaixo de ${pct(CFG.minLeg)} depois do filtro` : null }));
     });
@@ -133,8 +138,8 @@ function buildSlip(C) {
 }
 /* registo dos boletins do Boss (fica congelado quando começa o 1.º jogo) e das seleções que cortou */
 let SLIPS = LS.get('slips', {}), CUTS = LS.get('cuts', {});
-function snapshot(C, S) {
-  const d = ymd(Date.now()), old = SLIPS[d], now = Date.now();
+function snapshot(C, S, d) {
+  const old = SLIPS[d], now = Date.now();
   const started = old && old.legs.some(l => new Date(l.d).getTime() <= now);
   if (!started && S.legs.length) SLIPS[d] = { t: now, p: r3(S.p), legs: S.legs.map(c => ({ mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), odd: c.odd, est: c.est })) };
   C.filter(c => c.why).forEach(c => { const k = c.mi + '|' + c.id; if (!CUTS[k]) CUTS[k] = { mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), why: c.why, t: now }; });
@@ -152,9 +157,9 @@ function slipResult(F, S) {
 /* ---------- tudo calculado de uma vez ---------- */
 let STATE = null;
 function compute() {
-  const F = feeds(), G = groupStats(F), C = todayCands(F, G), S = buildSlip(C);
-  snapshot(C, S);
-  STATE = { F, G, C, S, t: Date.now() };
+  const F = feeds(), G = groupStats(F), D = {};
+  [0, 1].forEach(off => { const k = dayKey(off), C = dayCands(F, G, k), S = buildSlip(C); snapshot(C, S, k); D[off] = { k, C, S }; });
+  STATE = { F, G, D, t: Date.now() };
   return STATE;
 }
 
@@ -200,7 +205,7 @@ async function refreshAll() {
     LS.set('last', Date.now());
     compute();
     const ok = Object.values(res).filter(r => r.ok).length, n = Object.keys(res).length;
-    toast(`Atualizado: ${ok} de ${n} Misters${ok < n ? ' (vê em «Misters» quais falharam)' : ''} · ${STATE.C.length} seleções hoje`, 4500);
+    toast(`Atualizado: ${ok} de ${n} Misters${ok < n ? ' (vê em «Misters» quais falharam)' : ''} · hoje ${STATE.D[0].C.length} seleções, amanhã ${STATE.D[1].C.length}`, 4500);
   } catch (e) { toast('❌ ' + esc(e.message || e)); }
   finally { BUSY = false; document.body.classList.remove('busy'); if (btn) btn.classList.remove('spin'); render(); }
 }

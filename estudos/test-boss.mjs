@@ -30,7 +30,8 @@ await pg.evaluate(() => {
   compute(); render();
 });
 await pg.waitForTimeout(300);
-console.log('estado', JSON.stringify(await pg.evaluate(() => ({ misters: Object.keys(STATE.F), cands: STATE.C.length, cortadas: STATE.C.filter(c => c.why).length, boletim: STATE.S.legs.map(c => c.mk + ' ' + c.lb + ' ' + c.p + '→' + c.pb.toFixed(3)), promessa: STATE.S.p.toFixed(3), feedback: feedback(STATE.F).slice(0, 4).map(f => f.mk + ' ' + f.k + ' ' + (f.gap * 100).toFixed(0)) }))));
+console.log('estado', JSON.stringify(await pg.evaluate(() => ({ misters: Object.keys(STATE.F), hoje: STATE.D[0].k, cands: STATE.D[0].C.length, amanha: STATE.D[1].C.length, cortadas: STATE.D[0].C.filter(c => c.why).length, boletim: STATE.D[0].S.legs.map(c => c.mi + ' ' + hhmm(c.d) + ' ' + c.lb + ' ' + c.p + '→' + c.pb.toFixed(3)), promessa: STATE.D[0].S.p.toFixed(3), feedback: feedback(STATE.F).slice(0, 4).map(f => f.mk + ' ' + f.k + ' ' + (f.gap * 100).toFixed(0)) }))));
+await pg.evaluate(() => { DAY = 1; go('inicio'); }); await pg.waitForTimeout(200); await pg.screenshot({ path: OUT + '/1c-amanha.png', fullPage: true }); await pg.evaluate(() => { DAY = -1; go('inicio'); }); await pg.waitForTimeout(200); await pg.screenshot({ path: OUT + '/1d-ontem.png', fullPage: true }); await pg.evaluate(() => { DAY = 0; ORD = 'pct'; });
 for (const [v, f] of [['inicio', '1-inicio'], ['jogos', '2-selecoes'], ['stats', '3-stats'], ['misters', '5-misters'], ['mais', '6-mais']]) { await pg.evaluate(v => go(v), v); await pg.waitForTimeout(250); await pg.screenshot({ path: OUT + `/${f}.png`, fullPage: true }); }
 await pg.evaluate(() => { SM = 'vi'; go('stats'); }); await pg.waitForTimeout(250); await pg.screenshot({ path: OUT + '/4-stats-vi.png', fullPage: true });
 // atualizar tudo: abre os 5 Misters escondidos e manda-os atualizar
