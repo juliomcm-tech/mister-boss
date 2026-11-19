@@ -1,0 +1,24 @@
+{
+  "name": "Mister Boss",
+  "short_name": "Mister Boss",
+  "description": "O filtro final: junta o trabalho de todos os Misters e fica com o melhor do dia.",
+  "lang": "pt-PT",
+  "id": "./",
+  "start_url": "./?source=app#inicio",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1f6b40",
+  "theme_color": "#1f6b40",
+  "categories": ["sports", "entertainment"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Seleções", "url": "./#jogos", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Duelo", "url": "./#duelo", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Contas", "url": "./#contas", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ]
+}

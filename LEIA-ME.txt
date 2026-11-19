@@ -1,0 +1,12 @@
+MISTER BOSS · o filtro final
+============================
+Junta o trabalho de todos os Misters (Tó, Vi, Gi, Lu, Ko e Zé) que vivem no mesmo
+telemóvel/navegador, vê onde cada um acerta e onde falha, e monta o «Boletim do Boss».
+
+- Não tem modelo de jogos próprio: lê a «ficha para o Boss» que cada Mister guarda
+  (chave <mister>_boss) e, no caso do Zé, o diário e o boletim seguro dele (só leitura).
+- O ↻ do Boss abre o Tó, Vi, Gi, Lu e Ko escondidos e manda-os atualizar: não é preciso
+  tê-los instalados. O Zé não é tocado.
+- Tudo fica no telemóvel. Simulação, sem dinheiro real. +18.
+Para pôr online: GitHub → Settings → Pages → Branch: main / (root) → Save.
+© 2026 Júlio Melo

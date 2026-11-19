@@ -1,0 +1,206 @@
+/* =====================================================================
+   ÍCONES · ECRÃS
+   ===================================================================== */
+const ICP = {
+  home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  chart: '<path d="M4 20V11M10 20V5M16 20v-7M2 20h20"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><circle cx="17" cy="9" r="2.6"/><path d="M15.8 14.5c2.6.1 4.6 1.8 5.4 4.6"/>',
+  grid: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
+  refresh: '<path d="M20 11a8 8 0 0 0-14.9-3.5M4 4v4h4M4 13a8 8 0 0 0 14.9 3.5M20 20v-4h-4"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+  filter: '<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
+  check: '<path d="M5 12l5 5 9-10"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  save: '<path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/>', share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
+  warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>', phone: '<rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/>',
+  download: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>', open: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  gem: '<path d="M6 4h12l3 5-9 11L3 9zM3 9h18"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'
+};
+const ic = (n, cls) => `<svg class="i ${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICP[n] || ''}</svg>`;
+const attr = (label, v, color, txt) => `<div class="at" style="--k:${color}"><div class="l"><span>${label}</span><span class="v">${txt}</span></div><div class="bar"><i style="width:${clamp(v, 0, 100).toFixed(1)}%"></i></div></div>`;
+const catH = (icon, text, color, right) => `<div class="cat" style="--k:${color}">${ic(icon)}${text}${right ? `<span class="muted small" style="margin-left:auto;font-weight:400">${right}</span>` : ''}</div>`;
+const pnH = (title, right) => `<div class="pn-h">${title}${right ? `<span class="r">${right}</span>` : ''}</div><div class="div"></div>`;
+const mdot = (M, sz) => `<span class="mdot" style="background:${M.c};${sz ? `width:${sz}px;height:${sz}px;flex-basis:${sz}px` : ''}">${esc(M.ini)}</span>`;
+const mchip = M => `<span class="chipm" style="background:${M.c}">${esc(M.ini)}</span>`;
+const gapCls = g => g == null ? 'muted' : g >= -0.02 ? 'pos' : g >= -0.06 ? '' : 'neg';
+
+%%FACE%%
+
+const VIEWS = ['inicio', 'jogos', 'stats', 'misters', 'mais'];
+let VIEW = (location.hash || '#inicio').slice(1); if (!VIEWS.includes(VIEW)) VIEW = 'inicio';
+let MF = 'all';
+function go(v) { VIEW = v; history.replaceState(null, '', '#' + v); render(); window.scrollTo(0, 0); }
+function setUpd(t) { const e = $('#upd'); if (e) e.textContent = t; }
+function renderTop() {
+  const S = STATE || compute(), on = Object.keys(S.F).length;
+  $('#chips').innerHTML = MISTERS.map(M => { const f = S.F[M.k]; return `<span class="st" style="${f ? '' : 'opacity:.45'}" onclick="go('misters')">${esc(M.ini)} ${f ? (Object.values(f.legs).filter(l => l.st === 'open').length) : '—'}</span>`; }).join('');
+  const last = LS.get('last', 0);
+  setUpd(`${on} de ${MISTERS.length} Misters com dados · ${last ? 'atualizado ' + ago(last) : 'toca em ↻ para atualizar todos'}`);
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === VIEW));
+}
+function render() {
+  if (!STATE) compute();
+  renderTop();
+  const v = $('#view');
+  v.innerHTML = VIEW === 'inicio' ? viewInicio() : VIEW === 'jogos' ? viewSel() : VIEW === 'stats' ? viewStats() : VIEW === 'misters' ? viewMisters() : viewMais();
+}
+
+/* ---------- INÍCIO: o Boletim do Boss ---------- */
+function legRow(c, opts) {
+  const o = opts || {};
+  return `<div class="leg ${c.why ? 'cut' : ''}" style="grid-template-columns:auto 1fr auto">${mdot(c.M || MI[c.mi], 34)}
+    <div style="min-width:0"><div class="t">${esc(c.lb)}</div><div class="g">${esc(c.gl)} · ${dayLbl(c.d)} ${hhmm(c.d)} · ${esc(c.mkn || '')}${c.seg ? ' · ' + esc(segKey(c.seg)) : ''}</div>
+    <div class="p">${esc((c.M || MI[c.mi]).n.replace('Mister ', ''))} ${pct(c.p)}${c.pb != null && Math.abs(c.pb - c.p) >= 0.005 ? ` → <b>Boss ${pct(c.pb)}</b>` : c.pb != null ? ' · Boss confirma' : ''}${c.why ? ` · <span class="neg">cortada: ${esc(c.why)}</span>` : ''}</div></div>
+    <div class="o" style="text-align:right">${c.odd && !c.est ? odd2(c.odd) : '<span class="muted small">odd<br>Betano</span>'}</div></div>`;
+}
+function viewInicio() {
+  const S = STATE, ns = Object.keys(S.F).length, slip = S.S, last = LS.get('last', 0);
+  const y = ymd(Date.now() - 864e5), Y = SLIPS[y], Yr = Y ? slipResult(S.F, Y) : null, B = bossStats(S.F);
+  let h = `<div class="pn hero"><span class="tag">o filtro final</span>
+    <div class="big">${slip.legs.length ? `${slip.legs.length} <b>seleç${slip.legs.length === 1 ? 'ão' : 'ões'}</b>` : 'Mister <b>Boss</b>'}</div>
+    <div class="sub">${!ns ? 'Ainda não vejo nenhum Mister neste telemóvel. Toca em ↻ e eu ponho-os a trabalhar.' : slip.legs.length ? `O melhor de hoje de ${new Set(slip.legs.map(l => l.mi)).size} Mister${new Set(slip.legs.map(l => l.mi)).size === 1 ? '' : 's'}, já filtrado. Promessa honesta: <b>${pct(slip.p)}</b>.` : 'Hoje nada passa no meu filtro. Às vezes o melhor boletim é não ter boletim.'}</div>
+    <div class="face">${bossFace(Yr ? (Yr.st === 'won' ? 'win' : Yr.st === 'lost' ? 'sad' : 'ok') : 'ok')}</div>
+    <div class="kpis" style="margin-top:14px"><div class="kpi"><small>ontem</small><b>${Yr ? (Yr.st === 'won' ? '<span class="pos">✓</span>' : Yr.st === 'lost' ? '<span class="neg">✗</span>' : '…') : '—'}</b></div>
+      <div class="kpi"><small>boletins</small><b>${B.slips ? B.won + '/' + B.slips : '—'}</b></div><div class="kpi"><small>Misters</small><b>${ns}/${MISTERS.length}</b></div></div></div>`;
+  h += installBanner();
+  if (!ns) return h + `<div class="pn empty"><div class="face">${bossFace('ok')}</div><div class="pn-h" style="justify-content:center">Olá! Sou o Mister Boss.</div><div class="small muted" style="margin:6px 0 14px">Não analiso jogos: analiso <b>os Misters</b>. Junto o trabalho do Tó, Vi, Gi, Lu, Ko e Zé, vejo onde cada um acerta e onde falha, e fico com o melhor do dia.</div><button class="btn fill" onclick="refreshAll()">${ic('refresh')} Pôr os Misters a trabalhar</button><div class="small muted" style="margin-top:12px">Simulação: sem dinheiro real e sem ligação à Betano. +18 · Joga com responsabilidade.</div></div>`;
+  h += `<div class="pn hl">${pnH(`${ic('shield')} Boletim do Boss`, slip.legs.length ? `promete ${pct(slip.p)}` : '')}`;
+  if (slip.legs.length) {
+    h += slip.legs.map(c => legRow(c)).join('') + `<div class="small muted" style="margin-top:8px">Cada seleção vem do Mister que a fez, com a probabilidade dele e a do Boss (corrigida pela história desse Mister nesse tipo de aposta e nessa liga). Desportos diferentes não se influenciam, por isso juntá-los é seguro nas contas. Mete as odds da Betano na app do Mister para registar.</div>
+      <button class="btn go full" style="margin-top:10px" onclick="shareSlip()">${ic('share')} Partilhar o boletim</button>`;
+  } else h += `<div class="small muted">Nenhuma seleção passa dos ${pct(CFG.minLeg)} depois do filtro, ou os Misters ainda não têm jogos para hoje. ${last ? '' : 'Toca em ↻.'}</div>`;
+  h += `</div>`;
+  const cut = S.C.filter(c => c.why);
+  if (cut.length) h += `<div class="pn">${pnH(`${ic('filter')} O que o Boss cortou hoje`, cut.length + '')}${cut.slice(0, 6).map(c => legRow(c)).join('')}${cut.length > 6 ? `<button class="btn full" onclick="go('jogos')">Ver todas</button>` : ''}</div>`;
+  if (Y) h += `<div class="pn">${pnH(`${ic('check')} Boletim de ontem`, Yr.st === 'won' ? '<b class="pos">ganhou</b>' : Yr.st === 'lost' ? '<b class="neg">perdeu</b>' : 'em curso')}${Y.legs.map(l => `<div class="why"><span>${l.st === 'won' ? `<span class="pos">${ic('check')}</span>` : l.st === 'lost' ? `<span class="neg">${ic('x')}</span>` : '<span class="muted">…</span>'} ${mchip(MI[l.mi])} ${esc(l.lb)}</span><b class="muted">${pct(l.pb)}</b></div>`).join('')}</div>`;
+  const fb = feedback(S.F).slice(0, 3);
+  if (fb.length) h += `<div class="pn">${pnH(`${ic('bulb')} O Boss reparou`, '')}${fb.map(fbRow).join('')}<button class="btn full" style="margin-top:8px" onclick="go('misters')">Ver o feedback completo</button></div>`;
+  return h;
+}
+function shareSlip() {
+  const S = STATE.S; if (!S.legs.length) return;
+  const txt = `🧠 Boletim do Mister Boss · ${new Date().toLocaleDateString('pt-PT')}\n` + S.legs.map((c, i) => `${i + 1}) ${c.lb} (${c.gl}) · ${c.M.n} ${pct(c.p)} → Boss ${pct(c.pb)}`).join('\n') + `\nPromessa: ${pct(S.p)} · simulação, sem dinheiro real`;
+  (async () => { try { if (navigator.share) return await navigator.share({ text: txt }); } catch (e) { if (e && e.name === 'AbortError') return; } try { await navigator.clipboard.writeText(txt); toast('Copiado!'); } catch (e) { window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank'); } })();
+}
+/* ---------- SELEÇÕES: tudo o que os Misters propõem hoje ---------- */
+function viewSel() {
+  const S = STATE, C = S.C.filter(c => MF === 'all' || c.mi === MF), inSlip = new Set(S.S.legs.map(c => c.mi + '|' + c.id));
+  let h = `<div class="dates" style="margin-top:14px"><button class="${MF === 'all' ? 'on' : ''}" onclick="MF='all';render()"><b>Todos</b><small>${S.C.length}</small></button>${MISTERS.map(M => `<button class="${MF === M.k ? 'on' : ''}" onclick="MF='${M.k}';render()"><b>${esc(M.ini)}</b><small>${S.C.filter(c => c.mi === M.k).length}</small></button>`).join('')}</div>`;
+  if (!C.length) return h + `<div class="pn small muted">Sem seleções de 80%+ para as próximas 36 horas${MF === 'all' ? '' : ' neste Mister'}. ${LS.get('last', 0) ? '' : 'Toca em ↻ para pôr os Misters a trabalhar.'}</div>`;
+  const ok = C.filter(c => !c.why), cut = C.filter(c => c.why);
+  h += `<div class="pn">${pnH(`${ic('check')} Passam no filtro`, ok.length + '')}${ok.map(c => legRow(c) + (inSlip.has(c.mi + '|' + c.id) ? '<div class="small pos" style="margin:-4px 0 6px 46px">no Boletim do Boss</div>' : '')).join('') || '<div class="small muted">Nenhuma.</div>'}</div>`;
+  if (cut.length) h += `<div class="pn">${pnH(`${ic('filter')} Cortadas pelo Boss`, cut.length + '')}${cut.map(c => legRow(c)).join('')}</div>`;
+  return h + `<div class="small muted" style="margin:6px 4px">«Boss X%» = a probabilidade do Mister corrigida pelo que ele acertou até hoje nesse tipo de aposta e nessa liga. Sem resultados suficientes, o Boss confia no Mister.</div>`;
+}
+/* ---------- ESTATÍSTICAS ---------- */
+function calTable(o, title) {
+  const rows = Object.entries(o).filter(([, g]) => g.n >= 3).sort((a, b) => b[1].n - a[1].n);
+  if (!rows.length) return '';
+  return `<table class="tbl" style="margin-top:6px"><tr><th style="text-align:left">${title}</th><th>N</th><th>Prometia</th><th>Acertou</th><th>Dif.</th></tr>${rows.map(([k, g]) => { const gap = g.w / g.n - g.P / g.n; return `<tr><td style="text-align:left">${esc(k)}</td><td>${g.n}</td><td>${pct(g.P / g.n)}</td><td>${pct(g.w / g.n)}</td><td class="gap ${gapCls(gap)}">${sPts(gap)}</td></tr>`; }).join('')}</table>`;
+}
+let SM = 'boss';
+function viewStats() {
+  const S = STATE, B = bossStats(S.F);
+  let h = `<div class="dates" style="margin-top:14px"><button class="${SM === 'boss' ? 'on' : ''}" onclick="SM='boss';render()"><b>Boss</b><small>filtro</small></button>${MISTERS.map(M => `<button class="${SM === M.k ? 'on' : ''}" onclick="SM='${M.k}';render()"><b>${esc(M.ini)}</b><small>${S.F[M.k] ? misterStats(S.F, M.k).n : 0}</small></button>`).join('')}</div>`;
+  if (SM === 'boss') {
+    h += `<div class="pn hl">${pnH(`${ic('shield')} Boletins do Boss`, B.slips ? B.slips + ' decididos' : '')}
+      ${B.slips ? attr('Boletins inteiros certos', B.won / B.slips * 100, 'var(--c-blue)', `${B.won}/${B.slips} · prometia ${pct(B.prom)}`) : '<div class="small muted">Ainda nenhum boletim decidido. O Boss guarda o boletim de cada dia antes do 1.º jogo.</div>'}
+      ${B.legs ? attr('Seleções certas', B.legW / B.legs * 100, 'var(--c-green)', `${B.legW}/${B.legs} · prometia ${pct(B.legP)}`) : ''}</div>
+      <div class="pn">${pnH(`${ic('filter')} O filtro tinha razão?`, B.cuts ? B.cuts + ' cortes decididos' : '')}
+      ${B.cuts ? `${attr('Cortadas que falharam mesmo', B.cutLost / B.cuts * 100, 'var(--c-red)', `${B.cutLost}/${B.cuts}`)}<div class="small muted">Os Misters davam-lhes ${pct(B.cutP)} em média; ${B.cutLost / B.cuts > 1 - B.cutP ? '<b class="pos">falharam mais do que isso: o corte ajudou.</b>' : 'falharam menos do que isso: por agora o corte não ajudou (precisa de mais resultados).'}</div>` : '<div class="small muted">Quando houver cortes decididos, mostro se o Boss tinha razão em cortá-los.</div>'}</div>`;
+    h += `<div class="pn">${pnH(`${ic('users')} Cada Mister (seleções de 80%+)`, '')}${MISTERS.map(M => { const s = S.F[M.k] ? misterStats(S.F, M.k) : null; return `<div class="mrow" onclick="SM='${M.k}';render()">${mdot(M)}<div style="flex:1;min-width:0"><b>${esc(M.n)}</b><div class="small muted">${esc(M.s)}</div></div><div style="text-align:right">${s && s.n ? `<b>${pct(s.hit)}</b> <span class="small muted">de ${s.n}</span><div class="small gap ${gapCls(s.gap)}">prometia ${pct(s.prom)}</div>` : '<span class="small muted">sem dados</span>'}</div></div>`; }).join('')}</div>`;
+    return h;
+  }
+  const M = MI[SM], s = S.F[SM] ? misterStats(S.F, SM) : null;
+  h += `<div class="pn hl">${pnH(`${mdot(M, 30)} ${esc(M.n)}`, esc(M.s))}`;
+  if (!s || !s.n) return h + `<div class="small muted">${S.F[SM] ? 'Ainda sem seleções decididas.' : 'Este Mister ainda não deixou dados neste telemóvel.'}</div></div>`;
+  h += attr('Seleções de 80%+ certas', s.hit * 100, 'var(--c-blue)', `${s.w}/${s.n} · prometia ${pct(s.prom)}`) + `<div class="why"><span>Diferença (acertou − prometeu)</span><b class="gap ${gapCls(s.gap)}">${sPts(s.gap)}</b></div><div class="why"><span>Por decidir</span><b>${s.open}</b></div></div>`;
+  h += `<div class="pn">${pnH(`${ic('target')} Quando diz X%, acontece…`, '')}${calTable(s.bk, 'Confiança')}</div>`;
+  h += `<div class="pn">${pnH(`${ic('list')} Por tipo de aposta`, '')}${calTable(s.mk, 'Aposta')}</div>`;
+  h += `<div class="pn">${pnH(`${ic('chart')} Por liga / torneio / categoria`, '')}${calTable(s.seg, 'Onde') || '<div class="small muted">Precisa de 3+ seleções por grupo.</div>'}</div>`;
+  h += `<div class="pn">${pnH(`${ic('filter')} Tipo de aposta × onde`, '')}${calTable(s.mseg, 'Grupo') || '<div class="small muted">Precisa de 3+ seleções por grupo.</div>'}</div>`;
+  if (s.val.length) { const w = s.val.filter(l => l.st === 'won').length; h += `<div class="pn">${pnH(`${ic('gem')} Apostas de valor`, '')}<div class="why"><span>Certas</span><b>${w}/${s.val.length}</b></div></div>`; }
+  return h + `<div class="small muted" style="margin:6px 4px">Verde = acerta o que promete (ou mais). Vermelho = promete mais do que acerta. Com menos de ~30 seleções num grupo, a diferença ainda pode ser sorte.</div>`;
+}
+/* ---------- MISTERS: estado de cada um e o feedback do Boss ---------- */
+const fbRow = f => `<div class="frow">${mchip(MI[f.mk])} <b>${esc(MI[f.mk].n)}</b> ${f.gap < 0 ? 'promete' : 'é prudente demais em'} <b>${esc(f.k)}</b>: diz ${pct(f.prom)}, acerta ${pct(f.hit)} <span class="gap ${gapCls(f.gap)}">(${sPts(f.gap)})</span> <span class="muted small">em ${f.n} seleções${f.strong ? ' · o Boss já corta esta zona' : f.gap < 0 ? ' · a vigiar' : ''}</span></div>`;
+function viewMisters() {
+  const S = STATE, fb = feedback(S.F);
+  let h = `<div class="pn hl" style="margin-top:14px">${pnH(`${ic('users')} Os Misters neste telemóvel`, '')}` + MISTERS.map(M => {
+    const f = S.F[M.k], st = f ? misterStats(S.F, M.k) : null, run = LS.get('run_' + M.k, null);
+    return `<div class="mrow">${mdot(M)}<div style="flex:1;min-width:0"><b>${esc(M.n)}</b> <span class="small muted">${esc(M.s)}</span>
+      <div class="small muted">${f ? `dados ${ago(f.t)} · ${st.open} por decidir · ${st.n} decididas` : 'ainda sem dados aqui'}${run && !run.ok ? ` · <span class="neg">última atualização falhou (${esc(run.msg)})</span>` : ''}${M.k === 'ze' ? ' · só leitura' : ''}</div></div>
+      <a class="btn sm" href="${M.path}" target="_blank" rel="noopener">${ic('open')}</a></div>`;
+  }).join('') + `<div class="small muted" style="margin-top:8px">O ↻ do Boss põe o Tó, o Vi, o Gi, o Lu e o Ko a atualizar (não precisas de os abrir). O Zé é só lido: abre-o e atualiza-o como sempre.</div></div>`;
+  h += `<div class="pn">${pnH(`${ic('bulb')} Feedback do Boss`, fb.length ? fb.length + ' notas' : '')}${fb.length ? fb.map(fbRow).join('') : '<div class="small muted">Ainda não há resultados suficientes (15+ seleções decididas no mesmo tipo de aposta e liga) para dar feedback com confiança.</div>'}
+    <button class="btn go full" style="margin-top:10px" onclick="copyReport()">${ic('copy')} Copiar relatório para afinar os Misters</button>
+    <div class="small muted" style="margin-top:6px">Cola o relatório numa conversa com o Claude: com ele dá para corrigir o Mister certo no sítio certo. O Boss nunca mexe nos Misters sozinho.</div></div>`;
+  return h;
+}
+function reportText() {
+  const S = STATE, L = [`MISTER BOSS · relatório ${new Date().toLocaleString('pt-PT')} · v${APP_VER}`];
+  MISTERS.forEach(M => { const s = S.F[M.k] ? misterStats(S.F, M.k) : null; L.push(`${M.n}: ${s && s.n ? `${s.w}/${s.n} certas (${pct(s.hit)}) · prometia ${pct(s.prom)} · ${sPts(s.gap)}` : 'sem dados'}`); if (s && s.n) Object.entries(s.mk).filter(([, g]) => g.n >= 5).forEach(([k, g]) => L.push(`  · ${k}: ${g.w}/${g.n} · prometia ${pct(g.P / g.n)}`)); });
+  L.push('Zonas com diferença ≥4 pts (15+ seleções):'); feedback(S.F).forEach(f => L.push(`  · ${MI[f.mk].n} · ${f.k}: diz ${pct(f.prom)}, acerta ${pct(f.hit)} (${sPts(f.gap)}, n=${f.n})`));
+  const B = bossStats(S.F); L.push(`Boss: boletins ${B.won}/${B.slips} · seleções ${B.legW}/${B.legs} · cortes decididos ${B.cuts} (falharam ${B.cutLost})`);
+  return L.join('\n');
+}
+async function copyReport() { const t = reportText(); try { await navigator.clipboard.writeText(t); toast('Relatório copiado'); } catch (e) { openSheet('Relatório', `<textarea class="in" style="min-height:300px;font-size:.8rem">${esc(t)}</textarea>`); } }
+/* ---------- MAIS ---------- */
+function openSheet(title, html, short) { const b = $('#sheetBox'); b.className = 'box' + (short ? ' short' : ''); b.innerHTML = `<div class="sh"><h3>${title}</h3><button class="x" onclick="closeSheet()" aria-label="Fechar">${ic('x')}</button></div>${html}`; $('#sheet').classList.add('on'); b.scrollTop = 0; }
+function closeSheet() { $('#sheet').classList.remove('on'); }
+function viewMais() {
+  const T = [['info', 'Como pensa o Boss', 'openHow()'], ['gear', 'Definições', 'openCfg()'], ['save', 'Cópia de segurança', 'openBackup()'], ['copy', 'Relatório', 'copyReport()']];
+  if (!isStandalone()) T.push(['phone', 'Instalar app', 'openInstall()']);
+  return `<div class="tiles" style="margin-top:14px">${T.map(([i, l, f]) => `<div class="tile" onclick="${f}">${ic(i)}<b>${l}</b></div>`).join('')}</div>
+   <div class="pn small muted" style="text-align:center">Mister Boss v${APP_VER} · lê os Misters deste telemóvel<br>Simulação: sem dinheiro real e sem ligação à Betano. +18 · Joga com responsabilidade.<br>© 2026 Júlio Melo</div>`;
+}
+function openHow() {
+  openSheet('Como pensa o Boss', `<div class="pn" style="line-height:1.55">
+   ${catH('users', '1. Junta os Misters', 'var(--c-blue)')}<p>Cada Mister, quando atualiza, deixa neste telemóvel uma ficha com as seleções do dia que passam dos 80% e confere as antigas com o seu próprio código. O Zé é lido no diário dele. O Boss não tem modelo de jogos: o trabalho é dos Misters.</p>
+   ${catH('filter', '2. O filtro sobre o filtro', 'var(--c-blue)')}<p>Para cada Mister, cada tipo de aposta e cada liga ou torneio, o Boss soma o que foi prometido e o que aconteceu. A probabilidade do Mister é corrigida por essa história: <b>fiabilidade = (acertos + ${PRIOR}) ÷ (prometido + ${PRIOR})</b>. No início vale 1 (confia no Mister); só se mexe quando há resultados. Zonas com ${WEAK_N}+ seleções a falhar ${Math.round(WEAK_GAP * 100)}+ pontos abaixo do prometido são cortadas.</p>
+   ${catH('shield', '3. O Boletim do Boss', 'var(--c-blue)')}<p>Uma seleção por jogo, no máximo ${CFG.perMister} por Mister, só acima de ${pct(CFG.minLeg)} depois do filtro, juntas enquanto a promessa (com 1 ponto de folga por seleção) fica acima de ${pct(CFG.target)}. Jogos de desportos diferentes não se influenciam, por isso a conta do boletim é honesta.</p>
+   ${catH('bulb', '4. Feedback', 'var(--c-blue)')}<p>Onde um Mister promete mais do que acerta (ou é prudente demais), o Boss avisa. O relatório serve para afinar esse Mister. O Boss nunca muda nada sozinho.</p>
+   ${catH('warn', 'Honestidade', 'var(--c-red)')}<p>O Boss não cria vantagem sobre a casa: torna o boletim mais fiável e tira as zonas fracas. Precisa de tempo: com 1-2 meses de atualizações diárias começa a ver padrões a sério.</p></div>`);
+}
+function openCfg() {
+  const inp = (id, lbl, v, hint) => `<label class="f">${lbl}</label><input class="in" id="${id}" inputmode="decimal" value="${String(v).replace('.', ',')}">${hint ? `<div class="small muted">${hint}</div>` : ''}`;
+  openSheet('Definições', `${inp('c_t', 'Promessa mínima do boletim (%)', Math.round(CFG.target * 100), 'Mais alto = menos seleções, mais seguro.')}
+   ${inp('c_l', 'Probabilidade mínima de cada seleção (%)', Math.round(CFG.minLeg * 100))}${inp('c_n', 'Máximo de seleções', CFG.maxLegs)}${inp('c_p', 'Máximo por Mister', CFG.perMister)}
+   <label class="f">Misters que entram</label>${MISTERS.map(M => `<label class="why" style="cursor:pointer"><span>${mchip(M)} ${esc(M.n)}</span><input type="checkbox" id="c_on_${M.k}" ${CFG.off[M.k] ? '' : 'checked'}></label>`).join('')}
+   <button class="btn fill full" style="margin-top:14px" onclick="saveCfg()">Guardar</button>`);
+}
+function saveCfg() {
+  const v = id => num($('#' + id).value);
+  if (v('c_t') > 0) CFG.target = clamp(v('c_t'), 50, 95) / 100; if (v('c_l') > 0) CFG.minLeg = clamp(v('c_l'), 70, 97) / 100;
+  if (v('c_n') > 0) CFG.maxLegs = clamp(Math.round(v('c_n')), 1, 8); if (v('c_p') > 0) CFG.perMister = clamp(Math.round(v('c_p')), 1, 5);
+  MISTERS.forEach(M => { CFG.off[M.k] = !$('#c_on_' + M.k).checked; });
+  LS.set('cfg', CFG); closeSheet(); compute(); render(); toast('Guardado');
+}
+function openBackup() {
+  openSheet('Cópia de segurança', `<p class="small">Guarda os boletins e o registo do Boss num ficheiro. Os dados de cada Mister guardam-se na cópia de segurança de cada um.</p>
+   <button class="btn fill full" onclick="exportAll()">${ic('download')} Exportar</button>
+   <label class="f" style="margin-top:14px">Importar</label><input type="file" accept=".json" class="in" onchange="importAll(this)">`, true);
+}
+function exportAll() { const data = { cfg: CFG, slips: SLIPS, cuts: CUTS }; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: 'mister-boss', ver: APP_VER, t: Date.now(), data })], { type: 'application/json' })); a.download = 'mister-boss-copia-' + ymd(Date.now()) + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000); }
+function importAll(inp) { const f = inp.files && inp.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { const j = JSON.parse(r.result); if (j.app !== 'mister-boss') throw new Error('não é uma cópia do Mister Boss'); LS.set('cfg', j.data.cfg); LS.set('slips', j.data.slips); LS.set('cuts', j.data.cuts); toast('Importado'); setTimeout(() => location.reload(), 600); } catch (e) { toast(esc(e.message)); } }; r.readAsText(f); }
+/* ---------- instalar ---------- */
+let DEFER_INSTALL = null;
+const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); DEFER_INSTALL = e; if (VIEW === 'inicio') render(); });
+function installBanner() { if (isStandalone() || LS.get('instHide', 0)) return ''; return `<div class="pn inst"><span style="color:var(--blue)">${ic('phone')}</span><div class="t"><b>Instala o Mister Boss</b><small>Fica no ecrã do telemóvel, como uma app.</small></div><button class="btn fill sm" onclick="doInstall()">Instalar</button><button class="x" onclick="LS.set('instHide',1);render()" aria-label="Fechar">${ic('x')}</button></div>`; }
+async function doInstall() { if (DEFER_INSTALL) { DEFER_INSTALL.prompt(); try { const r = await DEFER_INSTALL.userChoice; if (r && r.outcome === 'accepted') LS.set('instHide', 1); } catch (e) {} DEFER_INSTALL = null; render(); return; } openInstall(); }
+function openInstall() { openSheet('Instalar como app', `<div class="pn"><b>Android (Chrome):</b> toca nos <b>⋮</b> e escolhe <b>«Instalar app»</b>.<br><br><b>iPhone:</b> no Safari, <b>Partilhar → «Adicionar ao ecrã principal»</b>. Atenção: no iPhone cada app instalada guarda os dados à parte; usa o Boss e os Misters no Safari para eles se verem.</div>`, true); }
+/* ---------- arranque ---------- */
+$('#topFace').innerHTML = bossFace('ok');
+$('#btnRefresh').innerHTML = ic('refresh');
+$('#btnRefresh').onclick = refreshAll;
+document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = ic(el.dataset.ic); });
+window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (VIEWS.includes(v) && v !== VIEW) { VIEW = v; render(); } });
+window.addEventListener('focus', () => { if (!BUSY) { compute(); render(); } });   // voltar de um Mister: lê outra vez
+compute(); render();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
