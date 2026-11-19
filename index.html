@@ -316,7 +316,7 @@ body.busy .top:after{content:"";position:absolute;left:0;right:0;bottom:0;height
    «Boletim do Boss» com o melhor do dia de todos os desportos.
    Não mexe em nenhum Mister: só lê o que eles guardam.
    ===================================================================== */
-const APP_VER = '1.4.0';
+const APP_VER = '1.5.0';
 
 /* ---------- utilitários ---------- */
 const $ = s => document.querySelector(s);
@@ -420,9 +420,30 @@ const graded = l => l.st === 'won' || l.st === 'lost';
    (25+ decididas e a falhar 6+ pontos abaixo do que prometem).
    ===================================================================== */
 const PRIOR = 25, MIN_LEVEL = 15, WEAK_N = 25, WEAK_GAP = 0.06;
+/* ---------- 🧠 APRENDER ----------
+   1) memória fresca: cada resultado pesa metade a cada HALF dias (o que aconteceu ontem conta mais do que há 3 meses)
+   2) auto-afinação: o Boss confere as suas próprias seleções de 85%+ e corrige-se (×cal)
+   3) corte que se corrige: se as zonas cortadas afinal acertam, o corte fica mais brando; se falham, mais duro */
+const HALF = 60, CAL_K = 30, CUT_K = 30;
+const ageW = d => { const a = (Date.now() - new Date(d).getTime()) / 864e5; return a <= 0 ? 1 : Math.pow(0.5, a / HALF); };
+let PASS = LS.get('pass', {});
+let LEARN = { cal: 1, calN: 0, calHit: null, calP: null, gap: WEAK_GAP, cutN: 0, cutHit: null, cutP: null };
+function learn(F) {
+  // 2) as seleções que passaram no filtro (antes da auto-afinação) contra o que aconteceu
+  let W = 0, P = 0, n = 0, rw = 0, rp = 0;
+  Object.values(PASS).forEach(x => { const st = legSt(F, x.mi, x.id); if (st !== 'won' && st !== 'lost') return; const a = ageW(x.d); n++; W += a * (st === 'won'); P += a * x.pb0; rw += st === 'won'; rp += x.pb0; });
+  const cal = clamp((W + CAL_K) / (P + CAL_K), 0.90, 1.02);
+  // 3) cortes por «zona fraca»: acertaram menos do que o Mister prometia? então o corte ajuda
+  let cw = 0, cp = 0, cn = 0, cr = 0, crp = 0;
+  Object.values(CUTS).forEach(c => { if (!/^zona fraca/.test(c.why || '')) return; const st = legSt(F, c.mi, c.id); if (st !== 'won' && st !== 'lost') return; const a = ageW(c.d); cn++; cw += a * (st === 'won'); cp += a * c.p; cr += st === 'won'; crp += c.p; });
+  const diff = (cw - cp) / (cn ? cn : 1) * (cn / (cn + CUT_K));        // <0: as cortadas falham mais do que o prometido → o corte ajuda
+  const gap = clamp(WEAK_GAP + 0.5 * diff, 0.04, 0.10);
+  LEARN = { cal, calN: n, calHit: n ? rw / n : null, calP: n ? rp / n : null, gap, cutN: cn, cutHit: cn ? cr / cn : null, cutP: cn ? crp / cn : null };
+  return LEARN;
+}
 function groupStats(F) {
   const G = {};
-  const add = (key, l) => { const g = G[key] = G[key] || { n: 0, w: 0, P: 0 }; g.n++; g.P += l.p; if (l.st === 'won') g.w++; };
+  const add = (key, l) => { const g = G[key] = G[key] || { n: 0, e: 0, w: 0, P: 0 }; const a = ageW(l.d); g.n++; g.e += a; g.P += a * l.p; if (l.st === 'won') g.w += a; };
   Object.entries(F).forEach(([mk, f]) => Object.values(f.legs).forEach(l => {
     if (!graded(l)) return;
     add(mk, l); add(mk + '|' + l.mkn, l); add(mk + '|' + l.mkn + '|' + segKey(l.seg), l);
@@ -432,12 +453,13 @@ function groupStats(F) {
 function judge(G, mk, l) {
   const keys = [mk + '|' + l.mkn + '|' + segKey(l.seg), mk + '|' + l.mkn, mk];
   let used = null;
-  for (const k of keys) { const g = G[k]; if (g && g.n >= MIN_LEVEL) { used = { k, g }; break; } }
-  const g = used ? used.g : { n: 0, w: 0, P: 0 };
+  for (const k of keys) { const g = G[k]; if (g && g.n >= MIN_LEVEL && g.e >= MIN_LEVEL / 2) { used = { k, g }; break; } }
+  const g = used ? used.g : { n: 0, e: 0, w: 0, P: 0 };
   const r = clamp((g.w + PRIOR) / (g.P + PRIOR), 0.8, 1.03);   // para cima, no máximo +3%: confiança a mais é o erro mais caro
   const fine = G[keys[0]];
-  const weak = fine && fine.n >= WEAK_N && fine.w / fine.n < fine.P / fine.n - WEAK_GAP;
-  return { r, n: g.n, lvl: used ? used.k.split('|').length : 0, weak, pb: Math.min(0.985, l.p * r) };
+  const weak = !!(fine && fine.n >= WEAK_N && fine.e >= WEAK_N / 2 && fine.w / fine.e < fine.P / fine.e - LEARN.gap);
+  const pb0 = Math.min(0.985, l.p * r);
+  return { r, n: g.n, lvl: used ? used.k.split('|').length : 0, weak, pb0, cal: LEARN.cal, pb: Math.min(0.985, pb0 * LEARN.cal) };
 }
 /* candidatos de um dia: seleções por decidir desse dia (que ainda não começaram) */
 const STALE_H = 18;
@@ -476,6 +498,9 @@ function playSlip(d, on) { const s = SLIPS[d]; if (!s) return; if (on) s.played 
 function snapshot(C, S, d) {
   const now = Date.now();
   if (!slipLocked(d) && S.legs.length) SLIPS[d] = { t: now, p: r3(S.p), legs: S.legs.map(c => ({ mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), odd: c.odd, est: c.est })) };
+  C.filter(c => !c.why).forEach(c => { const k = c.mi + '|' + c.id; if (!PASS[k] && new Date(c.d).getTime() > now) PASS[k] = { mi: c.mi, id: c.id, d: c.d, pb0: r3(c.pb0), t: now }; });
+  const pk = Object.keys(PASS); if (pk.length > 1500) pk.sort((a, b) => PASS[a].t - PASS[b].t).slice(0, pk.length - 1500).forEach(k => delete PASS[k]);
+  LS.set('pass', PASS);
   C.filter(c => c.why).forEach(c => { const k = c.mi + '|' + c.id; if (!CUTS[k]) CUTS[k] = { mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), why: c.why, t: now }; });
   const ks = Object.keys(CUTS); if (ks.length > 600) ks.sort((a, b) => CUTS[a].t - CUTS[b].t).slice(0, ks.length - 600).forEach(k => delete CUTS[k]);
   const ss = Object.keys(SLIPS).sort(); if (ss.length > 200) ss.slice(0, ss.length - 200).forEach(k => delete SLIPS[k]);
@@ -491,7 +516,7 @@ function slipResult(F, S) {
 /* ---------- tudo calculado de uma vez ---------- */
 let STATE = null;
 function compute() {
-  const F = feeds(), G = groupStats(F), D = {};
+  const F = feeds(); learn(F); const G = groupStats(F), D = {};
   [0, 1].forEach(off => { const k = dayKey(off), C = dayCands(F, G, k), S = buildSlip(C); snapshot(C, S, k); D[off] = { k, C, S }; });
   STATE = { F, G, D, t: Date.now() };
   return STATE;
@@ -841,6 +866,14 @@ function calTable(o, title) {
   return `<table class="tbl" style="margin-top:6px"><tr><th style="text-align:left">${title}</th><th>N</th><th>Prometia</th><th>Acertou</th><th>Dif.</th></tr>${rows.map(([k, g]) => { const gap = g.w / g.n - g.P / g.n; return `<tr><td style="text-align:left">${esc(k)}</td><td>${g.n}</td><td>${pct(g.P / g.n)}</td><td>${pct(g.w / g.n)}</td><td class="gap ${gapCls(gap)}">${sPts(gap)}</td></tr>`; }).join('')}</table>`;
 }
 let SM = 'boss';
+function learnBlock() {
+  const L = LEARN, calTxt = L.cal >= 0.995 && L.cal <= 1.005 ? 'sem correção' : (L.cal < 1 ? 'mais prudente ' : 'um pouco mais confiante ') + '×' + L.cal.toFixed(2).replace('.', ',');
+  return `<div class="pn">${pnH(`${ic('bulb')} Como o Boss está a aprender`, '')}
+    ${catH('clock', 'Memória fresca', 'var(--c-blue)')}<div class="small">Cada resultado vale metade a cada ${HALF} dias. Se um Mister entra em má fase (ou melhora), o Boss repara mais depressa.</div>
+    ${catH('shield', 'Auto-afinação', 'var(--c-blue)', calTxt)}<div class="small">${L.calN ? `As seleções que passaram no filtro acertaram <b>${pct(L.calHit)}</b> quando o Boss lhes dava <b>${pct(L.calP)}</b> (${L.calN} decididas).` : 'Ainda nenhuma seleção do Boss decidida.'} ${L.calN < CAL_K ? `Com poucos resultados mexe pouco (precisa de uns ${CAL_K} para se mexer a sério).` : 'Se acertar menos do que promete, fica mais prudente sozinho; se acertar mais, alivia um pouco.'}</div>
+    ${catH('filter', 'Rigor do corte', 'var(--c-blue)', `corta a ${Math.round(L.gap * 100)}+ pts`)}<div class="small">${L.cutN ? `As zonas fracas cortadas acertaram <b>${pct(L.cutHit)}</b> quando os Misters prometiam <b>${pct(L.cutP)}</b> (${L.cutN} decididas): ${L.cutHit < L.cutP ? 'o corte está a ajudar, por isso fica mais exigente.' : 'o corte não está a ajudar, por isso fica mais brando.'}` : 'Ainda não há zonas cortadas decididas.'} Começa em ${Math.round(WEAK_GAP * 100)} pts e anda entre 4 e 10.</div>
+    <div class="small muted" style="margin-top:8px">O Boss aprende só com resultados verdadeiros e nunca mexe nos Misters: corrige a confiança que tem neles.</div></div>`;
+}
 function viewStats() {
   const S = STATE, B = bossStats(S.F);
   let h = `<div class="dates" style="margin-top:14px"><button class="${SM === 'boss' ? 'on' : ''}" onclick="SM='boss';render()"><b>Boss</b><small>filtro</small></button>${MISTERS.map(M => `<button class="${SM === M.k ? 'on' : ''}" onclick="SM='${M.k}';render()"><b>${esc(M.ini)}</b><small>${S.F[M.k] ? misterStats(S.F, M.k).n : 0}</small></button>`).join('')}</div>`;
@@ -851,6 +884,7 @@ function viewStats() {
       ${B.legs ? attr('Seleções certas', B.legW / B.legs * 100, 'var(--c-green)', `${B.legW}/${B.legs} · prometia ${pct(B.legP)}`) : ''}
       <div class="why"><span>Arquivo do Boss (seleções decididas guardadas)</span><b>${archCount()}</b></div>
       <div class="why"><span>Boletins guardados</span><b>${Object.keys(SLIPS).length}</b></div></div>
+      ${learnBlock()}
       <div class="pn">${pnH(`${ic('filter')} O filtro tinha razão?`, B.cuts ? B.cuts + ' cortes decididos' : '')}
       ${B.cuts ? `${attr('Cortadas que falharam mesmo', B.cutLost / B.cuts * 100, 'var(--c-red)', `${B.cutLost}/${B.cuts}`)}<div class="small muted">Os Misters davam-lhes ${pct(B.cutP)} em média; ${B.cutLost / B.cuts > 1 - B.cutP ? '<b class="pos">falharam mais do que isso: o corte ajudou.</b>' : 'falharam menos do que isso: por agora o corte não ajudou (precisa de mais resultados).'}</div>` : '<div class="small muted">Quando houver cortes decididos, mostro se o Boss tinha razão em cortá-los.</div>'}</div>`;
     h += `<div class="pn">${pnH(`${ic('users')} Cada Mister (seleções de 80%+)`, '')}${MISTERS.map(M => { const s = S.F[M.k] ? misterStats(S.F, M.k) : null; return `<div class="mrow" onclick="SM='${M.k}';render()">${mdot(M)}<div style="flex:1;min-width:0"><b>${esc(M.n)}</b><div class="small muted">${esc(M.s)}</div></div><div style="text-align:right">${s && s.n ? `<b>${pct(s.hit)}</b> <span class="small muted">de ${s.n}</span><div class="small gap ${gapCls(s.gap)}">prometia ${pct(s.prom)}</div>` : '<span class="small muted">sem dados</span>'}</div></div>`; }).join('')}</div>`;
@@ -886,6 +920,7 @@ function reportText() {
   const S = STATE, L = [`MISTER BOSS · relatório ${new Date().toLocaleString('pt-PT')} · v${APP_VER}`];
   MISTERS.forEach(M => { const s = S.F[M.k] ? misterStats(S.F, M.k) : null; L.push(`${M.n}: ${s && s.n ? `${s.w}/${s.n} certas (${pct(s.hit)}) · prometia ${pct(s.prom)} · ${sPts(s.gap)}` : 'sem dados'}`); if (s && s.n) Object.entries(s.mk).filter(([, g]) => g.n >= 5).forEach(([k, g]) => L.push(`  · ${k}: ${g.w}/${g.n} · prometia ${pct(g.P / g.n)}`)); });
   L.push('Zonas com diferença ≥4 pts (15+ seleções):'); feedback(S.F).forEach(f => L.push(`  · ${MI[f.mk].n} · ${f.k}: diz ${pct(f.prom)}, acerta ${pct(f.hit)} (${sPts(f.gap)}, n=${f.n})`));
+  L.push(`Aprender: auto-afinação ×${LEARN.cal.toFixed(3)} (${LEARN.calN} decididas${LEARN.calN ? `, acertou ${pct(LEARN.calHit)} vs ${pct(LEARN.calP)}` : ''}) · corte a ${Math.round(LEARN.gap * 100)} pts (${LEARN.cutN} cortes decididos) · memória ${HALF} dias`);
   const B = bossStats(S.F); L.push(`Boss: boletins ${B.won}/${B.slips} · seleções ${B.legW}/${B.legs} · cortes decididos ${B.cuts} (falharam ${B.cutLost})`);
   return L.join('\n');
 }
@@ -913,7 +948,8 @@ function openHow() {
    ${catH('users', '1. Junta os Misters', 'var(--c-blue)')}<p>Cada Mister, quando atualiza, deixa neste telemóvel uma ficha com as seleções do dia que passam dos 80% e confere as antigas com o seu próprio código. O Zé é lido no diário dele. O Boss não tem modelo de jogos: o trabalho é dos Misters.</p>
    ${catH('filter', '2. O filtro sobre o filtro', 'var(--c-blue)')}<p>Para cada Mister, cada tipo de aposta e cada liga ou torneio, o Boss soma o que foi prometido e o que aconteceu. A probabilidade do Mister é corrigida por essa história: <b>fiabilidade = (acertos + ${PRIOR}) ÷ (prometido + ${PRIOR})</b>. No início vale 1 (confia no Mister); só se mexe quando há resultados. Zonas com ${WEAK_N}+ seleções a falhar ${Math.round(WEAK_GAP * 100)}+ pontos abaixo do prometido são cortadas.</p>
    ${catH('shield', '3. O Boletim do Boss', 'var(--c-blue)')}<p>Uma seleção por jogo, no máximo ${CFG.perMister} por Mister, só acima de ${pct(CFG.minLeg)} depois do filtro, juntas enquanto a promessa (com 1 ponto de folga por seleção) fica acima de ${pct(CFG.target)}. Jogos de desportos diferentes não se influenciam, por isso a conta do boletim é honesta.</p>
-   ${catH('bulb', '4. Feedback', 'var(--c-blue)')}<p>Onde um Mister promete mais do que acerta (ou é prudente demais), o Boss avisa. O relatório serve para afinar esse Mister. O Boss nunca muda nada sozinho.</p>
+   ${catH('clock', '4. Aprende sozinho', 'var(--c-blue)')}<p><b>Memória fresca:</b> cada resultado vale metade a cada ${HALF} dias. <b>Auto-afinação:</b> confere as suas próprias seleções de 85%+; se acertam menos do que prometia, fica mais prudente (entre ×0,90 e ×1,02). <b>Corte que se corrige:</b> se as zonas cortadas afinal acertam, corta menos; se falham, corta mais (entre 4 e 10 pts).</p>
+   ${catH('bulb', '5. Feedback', 'var(--c-blue)')}<p>Onde um Mister promete mais do que acerta (ou é prudente demais), o Boss avisa. O relatório serve para afinar esse Mister. O Boss nunca muda nada sozinho.</p>
    ${catH('warn', 'Honestidade', 'var(--c-red)')}<p>O Boss não cria vantagem sobre a casa: torna o boletim mais fiável e tira as zonas fracas. Precisa de tempo: com 1-2 meses de atualizações diárias começa a ver padrões a sério.</p></div>`);
 }
 function openCfg() {

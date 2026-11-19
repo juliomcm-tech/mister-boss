@@ -53,6 +53,22 @@ console.log('v14', JSON.stringify(await pg.evaluate(async () => {
   return { before, lk, after, live, kept: before === after, hasFrozen, shareSame, outFrozen, unfrozen, giStale, space, use: lsUse() };
 })));
 await pg.evaluate(() => go('mais')); await pg.waitForTimeout(200); await pg.screenshot({ path: OUT + '/6b-espaco.png', fullPage: true });
+// v1.5: aprender
+console.log('v15', JSON.stringify(await pg.evaluate(() => {
+  const r0 = { cal: LEARN.cal, gap: LEARN.gap };
+  // o Boss deu 90% a 120 seleções do Tó já decididas: acertaram ~?
+  const f = JSON.parse(localStorage.getItem('to_boss')); let i = 0;
+  Object.values(f.legs).filter(l => l.st !== 'open').forEach(l => { PASS['to|' + l.id] = { mi: 'to', id: l.id, d: l.d, pb0: 0.92, t: Date.now() - 1e6 }; i++; });
+  // cortes «zona fraca» do Vi que afinal ganharam quase todos
+  const v = JSON.parse(localStorage.getItem('vi_boss'));
+  Object.values(v.legs).filter(l => l.st === 'won').slice(0, 60).forEach(l => { CUTS['vi|' + l.id] = { mi: 'vi', id: l.id, d: l.d, p: 0.85, why: 'zona fraca: x', t: Date.now() }; });
+  compute(); render();
+  const out = { antes: r0, depois: { cal: LEARN.cal, calN: LEARN.calN, calHit: LEARN.calHit, gap: LEARN.gap, cutN: LEARN.cutN, cutHit: LEARN.cutHit }, boletim: STATE.D[0].S.legs.map(c => c.mi + ' ' + c.p + '→' + c.pb.toFixed(3) + ' (cal ' + c.cal.toFixed(3) + ')'), promessa: STATE.D[0].S.p.toFixed(3) };
+  SM = 'boss'; go('stats'); out.ui = document.body.innerText.includes('Como o Boss está a aprender');
+  out.w = [ageW(new Date().toISOString()).toFixed(2), ageW(new Date(Date.now() - 60 * 864e5).toISOString()).toFixed(2), ageW(new Date(Date.now() - 180 * 864e5).toISOString()).toFixed(3)];
+  return out;
+})));
+await pg.evaluate(() => { SM = 'boss'; go('stats'); }); await pg.waitForTimeout(200); await pg.screenshot({ path: OUT + '/3b-aprender.png', fullPage: true });
 // atualizar tudo: abre os 5 Misters escondidos e manda-os atualizar
 const t0 = Date.now(); await pg.evaluate(() => refreshAll()); await pg.waitForFunction(() => !BUSY, null, { timeout: 600000 });
 console.log('atualizar tudo', ((Date.now() - t0) / 1000).toFixed(0) + 's', 'pedidos ESPN', espn, JSON.stringify(await pg.evaluate(() => Object.fromEntries(MISTERS.filter(m => m.run).map(m => [m.k, LS.get('run_' + m.k, null)])))));

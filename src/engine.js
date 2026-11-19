@@ -7,7 +7,7 @@
    «Boletim do Boss» com o melhor do dia de todos os desportos.
    Não mexe em nenhum Mister: só lê o que eles guardam.
    ===================================================================== */
-const APP_VER = '1.4.0';
+const APP_VER = '1.5.0';
 
 /* ---------- utilitários ---------- */
 const $ = s => document.querySelector(s);
@@ -111,9 +111,30 @@ const graded = l => l.st === 'won' || l.st === 'lost';
    (25+ decididas e a falhar 6+ pontos abaixo do que prometem).
    ===================================================================== */
 const PRIOR = 25, MIN_LEVEL = 15, WEAK_N = 25, WEAK_GAP = 0.06;
+/* ---------- 🧠 APRENDER ----------
+   1) memória fresca: cada resultado pesa metade a cada HALF dias (o que aconteceu ontem conta mais do que há 3 meses)
+   2) auto-afinação: o Boss confere as suas próprias seleções de 85%+ e corrige-se (×cal)
+   3) corte que se corrige: se as zonas cortadas afinal acertam, o corte fica mais brando; se falham, mais duro */
+const HALF = 60, CAL_K = 30, CUT_K = 30;
+const ageW = d => { const a = (Date.now() - new Date(d).getTime()) / 864e5; return a <= 0 ? 1 : Math.pow(0.5, a / HALF); };
+let PASS = LS.get('pass', {});
+let LEARN = { cal: 1, calN: 0, calHit: null, calP: null, gap: WEAK_GAP, cutN: 0, cutHit: null, cutP: null };
+function learn(F) {
+  // 2) as seleções que passaram no filtro (antes da auto-afinação) contra o que aconteceu
+  let W = 0, P = 0, n = 0, rw = 0, rp = 0;
+  Object.values(PASS).forEach(x => { const st = legSt(F, x.mi, x.id); if (st !== 'won' && st !== 'lost') return; const a = ageW(x.d); n++; W += a * (st === 'won'); P += a * x.pb0; rw += st === 'won'; rp += x.pb0; });
+  const cal = clamp((W + CAL_K) / (P + CAL_K), 0.90, 1.02);
+  // 3) cortes por «zona fraca»: acertaram menos do que o Mister prometia? então o corte ajuda
+  let cw = 0, cp = 0, cn = 0, cr = 0, crp = 0;
+  Object.values(CUTS).forEach(c => { if (!/^zona fraca/.test(c.why || '')) return; const st = legSt(F, c.mi, c.id); if (st !== 'won' && st !== 'lost') return; const a = ageW(c.d); cn++; cw += a * (st === 'won'); cp += a * c.p; cr += st === 'won'; crp += c.p; });
+  const diff = (cw - cp) / (cn ? cn : 1) * (cn / (cn + CUT_K));        // <0: as cortadas falham mais do que o prometido → o corte ajuda
+  const gap = clamp(WEAK_GAP + 0.5 * diff, 0.04, 0.10);
+  LEARN = { cal, calN: n, calHit: n ? rw / n : null, calP: n ? rp / n : null, gap, cutN: cn, cutHit: cn ? cr / cn : null, cutP: cn ? crp / cn : null };
+  return LEARN;
+}
 function groupStats(F) {
   const G = {};
-  const add = (key, l) => { const g = G[key] = G[key] || { n: 0, w: 0, P: 0 }; g.n++; g.P += l.p; if (l.st === 'won') g.w++; };
+  const add = (key, l) => { const g = G[key] = G[key] || { n: 0, e: 0, w: 0, P: 0 }; const a = ageW(l.d); g.n++; g.e += a; g.P += a * l.p; if (l.st === 'won') g.w += a; };
   Object.entries(F).forEach(([mk, f]) => Object.values(f.legs).forEach(l => {
     if (!graded(l)) return;
     add(mk, l); add(mk + '|' + l.mkn, l); add(mk + '|' + l.mkn + '|' + segKey(l.seg), l);
@@ -123,12 +144,13 @@ function groupStats(F) {
 function judge(G, mk, l) {
   const keys = [mk + '|' + l.mkn + '|' + segKey(l.seg), mk + '|' + l.mkn, mk];
   let used = null;
-  for (const k of keys) { const g = G[k]; if (g && g.n >= MIN_LEVEL) { used = { k, g }; break; } }
-  const g = used ? used.g : { n: 0, w: 0, P: 0 };
+  for (const k of keys) { const g = G[k]; if (g && g.n >= MIN_LEVEL && g.e >= MIN_LEVEL / 2) { used = { k, g }; break; } }
+  const g = used ? used.g : { n: 0, e: 0, w: 0, P: 0 };
   const r = clamp((g.w + PRIOR) / (g.P + PRIOR), 0.8, 1.03);   // para cima, no máximo +3%: confiança a mais é o erro mais caro
   const fine = G[keys[0]];
-  const weak = fine && fine.n >= WEAK_N && fine.w / fine.n < fine.P / fine.n - WEAK_GAP;
-  return { r, n: g.n, lvl: used ? used.k.split('|').length : 0, weak, pb: Math.min(0.985, l.p * r) };
+  const weak = !!(fine && fine.n >= WEAK_N && fine.e >= WEAK_N / 2 && fine.w / fine.e < fine.P / fine.e - LEARN.gap);
+  const pb0 = Math.min(0.985, l.p * r);
+  return { r, n: g.n, lvl: used ? used.k.split('|').length : 0, weak, pb0, cal: LEARN.cal, pb: Math.min(0.985, pb0 * LEARN.cal) };
 }
 /* candidatos de um dia: seleções por decidir desse dia (que ainda não começaram) */
 const STALE_H = 18;
@@ -167,6 +189,9 @@ function playSlip(d, on) { const s = SLIPS[d]; if (!s) return; if (on) s.played 
 function snapshot(C, S, d) {
   const now = Date.now();
   if (!slipLocked(d) && S.legs.length) SLIPS[d] = { t: now, p: r3(S.p), legs: S.legs.map(c => ({ mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), odd: c.odd, est: c.est })) };
+  C.filter(c => !c.why).forEach(c => { const k = c.mi + '|' + c.id; if (!PASS[k] && new Date(c.d).getTime() > now) PASS[k] = { mi: c.mi, id: c.id, d: c.d, pb0: r3(c.pb0), t: now }; });
+  const pk = Object.keys(PASS); if (pk.length > 1500) pk.sort((a, b) => PASS[a].t - PASS[b].t).slice(0, pk.length - 1500).forEach(k => delete PASS[k]);
+  LS.set('pass', PASS);
   C.filter(c => c.why).forEach(c => { const k = c.mi + '|' + c.id; if (!CUTS[k]) CUTS[k] = { mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), why: c.why, t: now }; });
   const ks = Object.keys(CUTS); if (ks.length > 600) ks.sort((a, b) => CUTS[a].t - CUTS[b].t).slice(0, ks.length - 600).forEach(k => delete CUTS[k]);
   const ss = Object.keys(SLIPS).sort(); if (ss.length > 200) ss.slice(0, ss.length - 200).forEach(k => delete SLIPS[k]);
@@ -182,7 +207,7 @@ function slipResult(F, S) {
 /* ---------- tudo calculado de uma vez ---------- */
 let STATE = null;
 function compute() {
-  const F = feeds(), G = groupStats(F), D = {};
+  const F = feeds(); learn(F); const G = groupStats(F), D = {};
   [0, 1].forEach(off => { const k = dayKey(off), C = dayCands(F, G, k), S = buildSlip(C); snapshot(C, S, k); D[off] = { k, C, S }; });
   STATE = { F, G, D, t: Date.now() };
   return STATE;
