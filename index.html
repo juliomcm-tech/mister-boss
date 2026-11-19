@@ -316,7 +316,7 @@ body.busy .top:after{content:"";position:absolute;left:0;right:0;bottom:0;height
    «Boletim do Boss» com o melhor do dia de todos os desportos.
    Não mexe em nenhum Mister: só lê o que eles guardam.
    ===================================================================== */
-const APP_VER = '1.1.0';
+const APP_VER = '1.2.0';
 
 /* ---------- utilitários ---------- */
 const $ = s => document.querySelector(s);
@@ -717,10 +717,75 @@ function viewInicio() {
   if (fb.length) h += `<div class="pn">${pnH(`${ic('bulb')} O Boss reparou`, '')}${fb.map(fbRow).join('')}<button class="btn full" style="margin-top:8px" onclick="go('misters')">Ver o feedback completo</button></div>`;
   return h;
 }
-function shareSlip() {
-  const Dd = dayData(DAY), S = Dd && Dd.S; if (!S || !S.legs.length) return;
-  const txt = `🧠 Boletim do Mister Boss · ${dayName(DAY)} ${dayDate(Dd.k)}\n` + S.legs.map((c, i) => `${i + 1}) ${c.lb} (${c.gl}) · ${c.M.n} ${pct(c.p)} → Boss ${pct(c.pb)}`).join('\n') + `\nPromessa: ${pct(S.p)} · simulação, sem dinheiro real`;
-  (async () => { try { if (navigator.share) return await navigator.share({ text: txt }); } catch (e) { if (e && e.name === 'AbortError') return; } try { await navigator.clipboard.writeText(txt); toast('Copiado!'); } catch (e) { window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank'); } })();
+function slipText(Dd) {
+  return `🧠 Boletim do Mister Boss · ${dayName(DAY)} ${dayDate(Dd.k)}\n` + ordL(Dd.S.legs).map((c, i) => `${i + 1}) ${hhmm(c.d)} · ${c.lb} (${c.gl}) · ${c.M.n} ${pct(c.p)} → Boss ${pct(c.pb)}`).join('\n') + `\nPromessa: ${pct(Dd.S.p)} · simulação, sem dinheiro real · +18`;
+}
+/* imagem do boletim: vertical (1080 px), pronta para WhatsApp, Facebook e Instagram */
+async function slipImage(Dd) {
+  const legs = ordL(Dd.S.legs), W = 1080, cardH = 150, gapC = 20, top = 560;
+  const H = Math.max(1080, top + legs.length * (cardH + gapC) + 230);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+  try { await document.fonts.load('800 40px Outfit'); await document.fonts.ready; } catch (e) {}
+  const F = (w, s) => `${w} ${s}px Outfit, system-ui, sans-serif`;
+  const rr = (X, Y, w, h, r) => { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); };
+  const fit = (t, w, font) => { x.font = font; if (x.measureText(t).width <= w) return t; while (t.length > 3 && x.measureText(t + '…').width > w) t = t.slice(0, -1); return t + '…'; };
+  const svgImg = async (svg, s) => { const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.replace('<svg ', `<svg width="${s}" height="${s}" `)); await img.decode(); return img; };
+  // fundo: verde profundo, rede de pontos ligados e um foco de luz
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2f9a5d'); g.addColorStop(.45, '#15502f'); g.addColorStop(1, '#071d11');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const glow = x.createRadialGradient(W * .7, 120, 10, W * .7, 120, 620); glow.addColorStop(0, 'rgba(255,255,255,.28)'); glow.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = glow; x.fillRect(0, 0, W, 800);
+  let s = 5; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280; const P = []; for (let i = 0; i < 34; i++) P.push([rnd() * W, rnd() * 520]);
+  x.strokeStyle = 'rgba(220,255,232,.12)'; x.lineWidth = 2; P.forEach((p, i) => P.forEach((q, j) => { if (j > i && Math.hypot(p[0] - q[0], p[1] - q[1]) < 190) { x.beginPath(); x.moveTo(p[0], p[1]); x.lineTo(q[0], q[1]); x.stroke(); } }));
+  x.fillStyle = 'rgba(234,255,241,.35)'; P.forEach((p, i) => { x.beginPath(); x.arc(p[0], p[1], i % 6 ? 3.5 : 7, 0, 7); x.fill(); });
+  // cabeçalho: o Boss em pequeno + marca + data
+  try { x.save(); x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 24; x.shadowOffsetY = 8; x.drawImage(await svgImg(bossFace('win'), 128), 56, 44, 128, 128); x.restore(); } catch (e) {}
+  x.fillStyle = '#fff'; x.font = F(300, 46); x.fillText('Mister', 202, 106); const mw = x.measureText('Mister ').width; x.font = F(800, 46); x.fillText('Boss', 202 + mw, 106);
+  x.font = F(600, 22); x.fillStyle = 'rgba(255,255,255,.75)'; x.fillText('O  F I L T R O  F I N A L', 204, 142);
+  const chip = `${dayName(DAY).toUpperCase()} · ${dayDate(Dd.k).toUpperCase()}`; x.font = F(700, 26); const cw = x.measureText(chip).width + 52;
+  rr(W - 60 - cw, 78, cw, 58, 29); x.fillStyle = 'rgba(255,255,255,.16)'; x.fill(); x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 2; x.stroke();
+  x.fillStyle = '#fff'; x.fillText(chip, W - 60 - cw + 26, 116);
+  // título + mostrador da promessa
+  const nSp = new Set(legs.map(c => c.mi)).size;
+  x.fillStyle = '#fff'; x.font = F(800, 92); x.fillText('Boletim', 60, 318); x.fillText('do dia', 60, 412);
+  x.font = F(500, 32); x.fillStyle = 'rgba(255,255,255,.88)'; x.fillText(`${legs.length} seleç${legs.length === 1 ? 'ão' : 'ões'} · ${nSp} Mister${nSp === 1 ? '' : 's'}`, 62, 470);
+  const cx = W - 205, cy = 365, R = 118;
+  x.lineCap = 'round'; x.lineWidth = 26; x.strokeStyle = 'rgba(255,255,255,.16)'; x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2); x.stroke();
+  const ga = x.createLinearGradient(cx - R, cy - R, cx + R, cy + R); ga.addColorStop(0, '#ffe28a'); ga.addColorStop(1, '#ffb703');
+  x.strokeStyle = ga; x.beginPath(); x.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Dd.S.p); x.stroke(); x.lineCap = 'butt';
+  x.fillStyle = '#fff'; x.textAlign = 'center'; x.font = F(800, 70); x.fillText(pct(Dd.S.p), cx, cy + 22); x.font = F(600, 24); x.fillStyle = 'rgba(255,255,255,.8)'; x.fillText('PROMESSA', cx, cy + 62); x.textAlign = 'left';
+  // um cartão por seleção
+  legs.forEach((c, i) => {
+    const y = top + i * (cardH + gapC), M = c.M || MI[c.mi], pb = c.pb != null ? c.pb : c.p;
+    x.save(); x.shadowColor = 'rgba(0,0,0,.25)'; x.shadowBlur = 26; x.shadowOffsetY = 10; rr(50, y, W - 100, cardH, 30); x.fillStyle = '#fbfdfb'; x.fill(); x.restore();
+    x.save(); rr(50, y, W - 100, cardH, 30); x.clip(); x.fillStyle = M.c; x.fillRect(50, y, 14, cardH); x.restore();
+    x.fillStyle = M.c; x.beginPath(); x.arc(130, y + cardH / 2, 40, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = F(800, 30); x.textAlign = 'center'; x.fillText(M.ini, 130, y + cardH / 2 + 11); x.textAlign = 'left';
+    const tm = hhmm(c.d) + (new Date(c.d).getHours() < DAY_CUT ? ' 🌙' : ''); x.font = F(700, 24); const tw = x.measureText(tm).width + 28;
+    rr(196, y + 26, tw, 40, 20); x.fillStyle = '#164f30'; x.fill(); x.fillStyle = '#fff'; x.fillText(tm, 210, y + 54);
+    x.fillStyle = '#647a6d'; x.font = F(600, 22); x.fillText(fit(M.s.toUpperCase(), 520 - tw, F(600, 22)), 196 + tw + 14, y + 54);
+    x.fillStyle = '#10241a'; x.fillText(fit(c.lb, 560, F(700, 36)), 196, y + 103);
+    x.fillStyle = '#7d9186'; x.fillText(fit(c.gl, 560, F(400, 24)), 196, y + 134);
+    x.textAlign = 'right'; x.fillStyle = '#1e8a4a'; x.font = F(800, 56); x.fillText(pct(pb), W - 84, y + 86); x.textAlign = 'left';
+    rr(W - 84 - 150, y + 106, 150, 12, 6); x.fillStyle = '#e3efe7'; x.fill(); rr(W - 84 - 150, y + 106, 150 * pb, 12, 6); x.fillStyle = '#2b8f55'; x.fill();
+  });
+  // rodapé
+  const fy = H - 150; x.strokeStyle = 'rgba(255,215,110,.7)'; x.lineWidth = 3; x.beginPath(); x.moveTo(W / 2 - 90, fy); x.lineTo(W / 2 + 90, fy); x.stroke();
+  x.textAlign = 'center'; x.fillStyle = '#fff'; x.font = F(600, 30); x.fillText('O melhor do dia de todos os Misters, já filtrado.', W / 2, fy + 52);
+  x.fillStyle = 'rgba(255,255,255,.7)'; x.font = F(400, 24); x.fillText('Simulação, sem dinheiro real · +18 · Joga com responsabilidade', W / 2, fy + 94); x.textAlign = 'left';
+  return new Promise(res => cv.toBlob(res, 'image/png'));
+}
+async function shareSlip() {
+  const Dd = dayData(DAY); if (!Dd || !Dd.S.legs.length) return;
+  toast('A preparar a imagem…');
+  const txt = slipText(Dd);
+  try {
+    const blob = await slipImage(Dd), file = new File([blob], `boletim-boss-${Dd.k}.png`, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: txt }); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    toast('Imagem guardada nas transferências');
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    try { await navigator.clipboard.writeText(txt); toast('Copiado como texto'); } catch (e2) { window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank'); }
+  }
 }
 /* ---------- SELEÇÕES: tudo o que os Misters propõem hoje ---------- */
 function viewSel() {

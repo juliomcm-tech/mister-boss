@@ -7,7 +7,7 @@
    «Boletim do Boss» com o melhor do dia de todos os desportos.
    Não mexe em nenhum Mister: só lê o que eles guardam.
    ===================================================================== */
-const APP_VER = '1.1.0';
+const APP_VER = '1.2.0';
 
 /* ---------- utilitários ---------- */
 const $ = s => document.querySelector(s);

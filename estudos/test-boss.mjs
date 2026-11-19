@@ -38,5 +38,7 @@ await pg.evaluate(() => { SM = 'vi'; go('stats'); }); await pg.waitForTimeout(25
 const t0 = Date.now(); await pg.evaluate(() => refreshAll()); await pg.waitForFunction(() => !BUSY, null, { timeout: 600000 });
 console.log('atualizar tudo', ((Date.now() - t0) / 1000).toFixed(0) + 's', 'pedidos ESPN', espn, JSON.stringify(await pg.evaluate(() => Object.fromEntries(MISTERS.filter(m => m.run).map(m => [m.k, LS.get('run_' + m.k, null)])))));
 console.log('relatório:\n' + await pg.evaluate(() => reportText()));
+const png = await pg.evaluate(async () => { DAY = 0; const b = await slipImage(STATE.D[0]); const r = new FileReader(); return await new Promise(ok => { r.onload = () => ok(r.result); r.readAsDataURL(b); }); });
+fs.writeFileSync(OUT + '/7-partilha.png', Buffer.from(png.split(',')[1], 'base64'));
 console.log('erros JS:', errs.length ? errs : 'nenhum');
 await b.close(); srv.close();
