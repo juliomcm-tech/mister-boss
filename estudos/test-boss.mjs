@@ -34,6 +34,25 @@ console.log('estado', JSON.stringify(await pg.evaluate(() => ({ misters: Object.
 await pg.evaluate(() => { DAY = 1; go('inicio'); }); await pg.waitForTimeout(200); await pg.screenshot({ path: OUT + '/1c-amanha.png', fullPage: true }); await pg.evaluate(() => { DAY = -1; go('inicio'); }); await pg.waitForTimeout(200); await pg.screenshot({ path: OUT + '/1d-ontem.png', fullPage: true }); await pg.evaluate(() => { DAY = 0; ORD = 'pct'; });
 for (const [v, f] of [['inicio', '1-inicio'], ['jogos', '2-selecoes'], ['stats', '3-stats'], ['misters', '5-misters'], ['mais', '6-mais']]) { await pg.evaluate(v => go(v), v); await pg.waitForTimeout(250); await pg.screenshot({ path: OUT + `/${f}.png`, fullPage: true }); }
 await pg.evaluate(() => { SM = 'vi'; go('stats'); }); await pg.waitForTimeout(250); await pg.screenshot({ path: OUT + '/4-stats-vi.png', fullPage: true });
+// v1.4: jogar/congelar, partilha do congelado, dados velhos
+console.log('v14', JSON.stringify(await pg.evaluate(async () => {
+  const k = STATE.D[0].k, before = SLIPS[k].legs.map(l => l.id).join(',');
+  playSlip(k, true); const lk = slipLocked(k);
+  // mudar as probabilidades do Tó: o boletim congelado não pode mudar
+  const f = JSON.parse(localStorage.getItem('to_boss')); Object.values(f.legs).forEach(l => { if (l.st === 'open') l.p = 0.97; }); localStorage.setItem('to_boss', JSON.stringify(f));
+  compute(); const after = SLIPS[k].legs.map(l => l.id).join(','), live = STATE.D[0].S.legs.map(l => l.id).join(',');
+  go('inicio'); const hasFrozen = document.body.innerText.includes('Congelado por ti');
+  const sd = shareDd(); const shareSame = sd.S.legs.map(l => l.id).join(',') === before;
+  go('jogos'); const outFrozen = document.body.innerText.includes('já está congelado');
+  playSlip(k, false); compute(); const unfrozen = !slipLocked(k);
+  // dados velhos: Gi há 20 h
+  const g = JSON.parse(localStorage.getItem('gi_boss')); g.t = Date.now() - 20 * 3600e3; localStorage.setItem('gi_boss', JSON.stringify(g)); compute(); render();
+  const giStale = STATE.D[0].C.filter(c => c.mi === 'gi').every(c => /mais de 18 h/.test(c.why || '')) && !STATE.D[0].S.legs.some(c => c.mi === 'gi');
+  g.t = Date.now() - 2 * 3600e3; localStorage.setItem('gi_boss', JSON.stringify(g)); compute(); render();
+  go('mais'); const space = document.body.innerText.includes('Espaço dos Misters');
+  return { before, lk, after, live, kept: before === after, hasFrozen, shareSame, outFrozen, unfrozen, giStale, space, use: lsUse() };
+})));
+await pg.evaluate(() => go('mais')); await pg.waitForTimeout(200); await pg.screenshot({ path: OUT + '/6b-espaco.png', fullPage: true });
 // atualizar tudo: abre os 5 Misters escondidos e manda-os atualizar
 const t0 = Date.now(); await pg.evaluate(() => refreshAll()); await pg.waitForFunction(() => !BUSY, null, { timeout: 600000 });
 console.log('atualizar tudo', ((Date.now() - t0) / 1000).toFixed(0) + 's', 'pedidos ESPN', espn, JSON.stringify(await pg.evaluate(() => Object.fromEntries(MISTERS.filter(m => m.run).map(m => [m.k, LS.get('run_' + m.k, null)])))));

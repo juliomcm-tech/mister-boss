@@ -42,7 +42,7 @@ function go(v) { VIEW = v; history.replaceState(null, '', '#' + v); render(); wi
 function setUpd(t) { const e = $('#upd'); if (e) e.textContent = t; }
 function renderTop() {
   const S = STATE || compute(), on = Object.keys(S.F).length;
-  $('#chips').innerHTML = MISTERS.map(M => { const f = S.F[M.k]; return `<span class="st" style="${f ? '' : 'opacity:.45'}" onclick="go('misters')">${esc(M.ini)} ${f ? S.D[0].C.filter(c => c.mi === M.k).length : '—'}</span>`; }).join('');
+  $('#chips').innerHTML = MISTERS.map(M => { const f = S.F[M.k]; const old = staleF(f); return `<span class="st" style="${f && !f.arch ? '' : 'opacity:.45'}${old ? ';background:rgba(240,170,40,.35);border-color:#f0aa28' : ''}" onclick="go('misters')">${esc(M.ini)} ${f && !f.arch ? (old ? '⏳' : S.D[0].C.filter(c => c.mi === M.k && !c.why).length) : '—'}</span>`; }).join('');
   const last = LS.get('last', 0);
   setUpd(`${on} de ${MISTERS.length} Misters com dados · ${last ? 'atualizado ' + ago(last) : 'toca em ↻ para atualizar todos'}`);
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === VIEW));
@@ -62,10 +62,10 @@ function legRow(c, opts) {
     <div class="p">${esc((c.M || MI[c.mi]).n.replace('Mister ', ''))} ${pct(c.p)}${c.pb != null && Math.abs(c.pb - c.p) >= 0.005 ? ` → <b>Boss ${pct(c.pb)}</b>` : c.pb != null ? ' · Boss confirma' : ''}${c.why ? ` · <span class="neg">cortada: ${esc(c.why)}</span>` : ''}</div></div>
     <div class="o" style="text-align:right">${c.odd && !c.est ? odd2(c.odd) : '<span class="muted small">odd<br>Betano</span>'}</div></div>`;
 }
-function pastSlip(k) {
+function pastSlip(k, live) {
   const Y = SLIPS[k]; if (!Y) return `<div class="pn small muted">O Boss não guardou boletim para ${dayDate(k)} (só guarda quando o ↻ é feito antes dos jogos).</div>`;
   const r = slipResult(STATE.F, Y);
-  return `<div class="pn hl">${pnH(`${ic('shield')} Boletim do Boss · ${dayDate(k)}`, r.st === 'won' ? '<b class="pos">ganhou</b>' : r.st === 'lost' ? '<b class="neg">perdeu</b>' : 'em curso')}${Y.legs.map(l => `<div class="why"><span>${l.st === 'won' ? `<span class="pos">${ic('check')}</span>` : l.st === 'lost' ? `<span class="neg">${ic('x')}</span>` : '<span class="muted">…</span>'} ${mchip(MI[l.mi])} ${esc(l.lb)} <span class="muted small">${esc(l.gl)}</span></span><b class="muted">${pct(l.pb)}</b></div>`).join('')}<div class="small muted" style="margin-top:6px">Prometia ${pct(Y.p)} · ${r.w}/${r.n} seleções certas até agora</div></div>`;
+  return `<div class="pn hl">${pnH(`${ic('shield')} Boletim do Boss · ${dayDate(k)}`, r.st === 'won' ? '<b class="pos">ganhou</b>' : r.st === 'lost' ? '<b class="neg">perdeu</b>' : 'em curso')}${Y.legs.map(l => `<div class="why"><span>${l.st === 'won' ? `<span class="pos">${ic('check')}</span>` : l.st === 'lost' ? `<span class="neg">${ic('x')}</span>` : '<span class="muted">…</span>'} ${mchip(MI[l.mi])} ${esc(l.lb)} <span class="muted small">${esc(l.gl)}</span></span><b class="muted">${pct(l.pb)}</b></div>`).join('')}<div class="small muted" style="margin-top:6px">Prometia ${pct(Y.p)} · ${r.w}/${r.n} seleções certas até agora${Y.played ? ' · <b class="pos">jogaste este</b>' : ''}</div>${live ? `<div class="small" style="margin-top:6px;color:var(--blue)">${ic('save')} Congelado${Y.played ? ' por ti' : ` (faltam menos de ${LOCK_MIN} min para o 1.º jogo)`}: já não muda.</div>` : ''}${live && Y.played && !Y.legs.some(l => new Date(l.d).getTime() <= Date.now()) ? `<button class="btn full" style="margin-top:8px" onclick="playSlip('${k}',false);render()">Afinal não joguei (descongelar)</button>` : ''}${live ? `<button class="btn go full" style="margin-top:8px" onclick="shareSlip()">${ic('share')} Partilhar o boletim</button>` : ''}</div>`;
 }
 function viewInicio() {
   const S = STATE, ns = Object.keys(S.F).length, last = LS.get('last', 0), B = bossStats(S.F);
@@ -86,13 +86,13 @@ function viewInicio() {
     if (fb.length) h += `<div class="pn">${pnH(`${ic('bulb')} O Boss reparou`, '')}${fb.map(fbRow).join('')}<button class="btn full" style="margin-top:8px" onclick="go('misters')">Ver o feedback completo</button></div>`;
     return h;
   }
-  const saved = SLIPS[Dd.k], locked = saved && saved.legs.some(l => new Date(l.d).getTime() <= Date.now());
-  if (locked) h += pastSlip(Dd.k);
+  if (slipLocked(Dd.k)) h += pastSlip(Dd.k, true);
   else {
     h += `<div class="pn hl">${pnH(`${ic('shield')} Boletim do Boss · ${dayName(DAY).toLowerCase()}`, slip.legs.length ? `promete ${pct(slip.p)}` : '')}`;
     if (slip.legs.length) h += ordSeg() + ordL(slip.legs).map(c => legRow(c)).join('') + `<div class="small muted" style="margin-top:8px">Só jogos de ${DAY === 0 ? 'hoje' : 'amanhã'}. 🌙 = começa de madrugada (até às 6h), ainda conta como esta noite. Cada seleção traz a probabilidade do Mister e a do Boss. Mete as odds da Betano na app do Mister para registar.</div>
-      <div class="small" style="margin-top:8px;color:var(--blue)">${ic('save')} Guardado automaticamente${SLIPS[Dd.k] ? ' às ' + hhmm(SLIPS[Dd.k].t) : ''}: fica congelado quando começa o 1.º jogo e é conferido sozinho.</div>
-      <button class="btn go full" style="margin-top:10px" onclick="shareSlip()">${ic('share')} Partilhar o boletim</button>`;
+      <div class="small" style="margin-top:8px;color:var(--blue)">${ic('save')} Guardado automaticamente${SLIPS[Dd.k] ? ' às ' + hhmm(SLIPS[Dd.k].t) : ''}. Até ${LOCK_MIN} min antes do 1.º jogo ainda se pode afinar com novos dados; depois congela e é conferido sozinho.</div>
+      <button class="btn full" style="margin-top:10px" onclick="playSlip('${Dd.k}',true);toast('Boletim marcado como jogado: já não muda');render()">${ic('check')} Joguei este boletim (congelar já)</button>
+      <button class="btn go full" style="margin-top:8px" onclick="shareSlip()">${ic('share')} Partilhar o boletim</button>`;
     else h += `<div class="small muted">Nenhuma seleção de ${DAY === 0 ? 'hoje' : 'amanhã'} passa dos ${pct(CFG.minLeg)} depois do filtro, ou os Misters ainda não têm jogos para esse dia. ${last ? '' : 'Toca em ↻.'}</div>`;
     h += `</div>`;
   }
@@ -159,8 +159,13 @@ async function slipImage(Dd) {
   x.fillStyle = 'rgba(255,255,255,.7)'; x.font = F(400, 24); x.fillText('Simulação, sem dinheiro real · +18 · Joga com responsabilidade', W / 2, fy + 94); x.textAlign = 'left';
   return new Promise(res => cv.toBlob(res, 'image/png'));
 }
+function shareDd() {
+  const Dd = dayData(DAY); if (!Dd) return null;
+  if (!slipLocked(Dd.k)) return Dd;
+  const Y = SLIPS[Dd.k]; return { k: Dd.k, S: { p: Y.p, legs: Y.legs.map(l => Object.assign({ M: MI[l.mi] }, l)) } };
+}
 async function shareSlip() {
-  const Dd = dayData(DAY); if (!Dd || !Dd.S.legs.length) return;
+  const Dd = shareDd(); if (!Dd || !Dd.S.legs.length) return;
   toast('A preparar a imagem…');
   const txt = slipText(Dd);
   try {
@@ -176,7 +181,8 @@ async function shareSlip() {
 /* ---------- SELEÇÕES: tudo o que os Misters propõem hoje ---------- */
 function viewSel() {
   if (DAY === -1) DAY = 0;
-  const Dd = dayData(DAY), C = Dd.C.filter(c => MF === 'all' || c.mi === MF), inSlip = new Set(Dd.S.legs.map(c => c.mi + '|' + c.id));
+  const Dd = dayData(DAY), C = Dd.C.filter(c => MF === 'all' || c.mi === MF), lk = slipLocked(Dd.k), inSlip = new Set((lk ? SLIPS[Dd.k].legs : Dd.S.legs).map(c => c.mi + '|' + c.id));
+  if (lk) C.forEach(c => { if (!c.why && !inSlip.has(c.mi + '|' + c.id)) c.out = 'o boletim de hoje já está congelado'; });
   let h = `<div class="dates" style="margin-top:14px">${[0, 1].map(o => `<button class="${DAY === o ? 'on' : ''}" onclick="DAY=${o};render()"><b>${dayName(o)}</b><small>${dayDate(dayKey(o))} · ${STATE.D[o].C.length}</small></button>`).join('')}</div>
     <div class="dates" style="margin-top:6px"><button class="${MF === 'all' ? 'on' : ''}" onclick="MF='all';render()"><b>Todos</b><small>${Dd.C.length}</small></button>${MISTERS.map(M => `<button class="${MF === M.k ? 'on' : ''}" onclick="MF='${M.k}';render()"><b>${esc(M.ini)}</b><small>${Dd.C.filter(c => c.mi === M.k).length}</small></button>`).join('')}</div>`;
   if (!C.length) return h + `<div class="pn small muted">Sem seleções de 80%+ para ${DAY === 0 ? 'hoje' : 'amanhã'}${MF === 'all' ? '' : ' neste Mister'}. ${LS.get('last', 0) ? '' : 'Toca em ↻ para pôr os Misters a trabalhar.'}</div>`;
@@ -199,6 +205,7 @@ function viewStats() {
   if (SM === 'boss') {
     h += `<div class="pn hl">${pnH(`${ic('shield')} Boletins do Boss`, B.slips ? B.slips + ' decididos' : '')}
       ${B.slips ? attr('Boletins inteiros certos', B.won / B.slips * 100, 'var(--c-blue)', `${B.won}/${B.slips} · prometia ${pct(B.prom)}`) : '<div class="small muted">Ainda nenhum boletim decidido. O Boss guarda o boletim de cada dia antes do 1.º jogo.</div>'}
+      ${B.played ? attr('Boletins que jogaste certos', B.playedW / B.played * 100, 'var(--c-orange, #e08a1e)', `${B.playedW}/${B.played} · prometia ${pct(B.playedP)}`) : ''}
       ${B.legs ? attr('Seleções certas', B.legW / B.legs * 100, 'var(--c-green)', `${B.legW}/${B.legs} · prometia ${pct(B.legP)}`) : ''}
       <div class="why"><span>Arquivo do Boss (seleções decididas guardadas)</span><b>${archCount()}</b></div>
       <div class="why"><span>Boletins guardados</span><b>${Object.keys(SLIPS).length}</b></div></div>
@@ -244,10 +251,19 @@ async function copyReport() { const t = reportText(); try { await navigator.clip
 /* ---------- MAIS ---------- */
 function openSheet(title, html, short) { const b = $('#sheetBox'); b.className = 'box' + (short ? ' short' : ''); b.innerHTML = `<div class="sh"><h3>${title}</h3><button class="x" onclick="closeSheet()" aria-label="Fechar">${ic('x')}</button></div>${html}`; $('#sheet').classList.add('on'); b.scrollTop = 0; }
 function closeSheet() { $('#sheet').classList.remove('on'); }
+function spaceBlock() {
+  const U = lsUse(), cap = 5 * 1024 * 1024, kb = n => n < 1024 * 1024 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1).replace('.', ',') + ' MB';
+  const nm = { to: 'Tó', vi: 'Vi', gi: 'Gi', lu: 'Lu', ko: 'Ko', boss: 'Boss', ze: 'Zé' }, f = U.tot / cap;
+  return `<div class="pn">${pnH(`${ic('save')} Espaço dos Misters neste telemóvel`, kb(U.tot) + ' de ~5 MB')}
+    ${attr('Ocupado', Math.min(100, f * 100), f > 0.8 ? 'var(--c-red)' : 'var(--c-green)', pct(f))}
+    ${Object.entries(U.by).sort((a, b) => b[1] - a[1]).map(([p, n]) => `<div class="why"><span>${esc(nm[p] || p)}</span><b class="muted">${kb(n)}</b></div>`).join('')}
+    <div class="small muted" style="margin-top:6px">Todos os Misters do site partilham este espaço do navegador. ${f > 0.8 ? '<b class="neg">Está quase cheio: faz uma cópia de segurança.</b>' : 'Está tudo bem.'}</div></div>`;
+}
 function viewMais() {
   const T = [['info', 'Como pensa o Boss', 'openHow()'], ['gear', 'Definições', 'openCfg()'], ['save', 'Cópia de segurança', 'openBackup()'], ['copy', 'Relatório', 'copyReport()']];
   if (!isStandalone()) T.push(['phone', 'Instalar app', 'openInstall()']);
   return `<div class="tiles" style="margin-top:14px">${T.map(([i, l, f]) => `<div class="tile" onclick="${f}">${ic(i)}<b>${l}</b></div>`).join('')}</div>
+   ${spaceBlock()}
    <div class="pn small muted" style="text-align:center">Mister Boss v${APP_VER} · lê os Misters deste telemóvel<br>Simulação: sem dinheiro real e sem ligação à Betano. +18 · Joga com responsabilidade.<br>© 2026 Júlio Melo</div>`;
 }
 function openHow() {

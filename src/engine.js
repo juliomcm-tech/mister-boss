@@ -7,7 +7,7 @@
    «Boletim do Boss» com o melhor do dia de todos os desportos.
    Não mexe em nenhum Mister: só lê o que eles guardam.
    ===================================================================== */
-const APP_VER = '1.3.0';
+const APP_VER = '1.4.0';
 
 /* ---------- utilitários ---------- */
 const $ = s => document.querySelector(s);
@@ -96,6 +96,7 @@ function archive(F) {
   });
   return F;
 }
+function lsUse() { const by = {}; let tot = 0; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i), n = (k.length + (localStorage.getItem(k) || '').length) * 2; tot += n; const p = (k.match(/^([a-z]+)_/) || [, 'outros'])[1]; by[p] = (by[p] || 0) + n; } } catch (e) {} return { tot, by }; }
 const archCount = () => Object.keys(LS.get('hist', {})).length;
 const segKey = s => !s ? '—' : [s.lg, s.cat].filter(Boolean).join(' · ');
 const graded = l => l.st === 'won' || l.st === 'lost';
@@ -130,6 +131,8 @@ function judge(G, mk, l) {
   return { r, n: g.n, lvl: used ? used.k.split('|').length : 0, weak, pb: Math.min(0.985, l.p * r) };
 }
 /* candidatos de um dia: seleções por decidir desse dia (que ainda não começaram) */
+const STALE_H = 18;
+const staleF = f => !!(f && f.t && Date.now() - f.t > STALE_H * 3600e3);
 function dayCands(F, G, key) {
   const now = Date.now(), out = [];
   Object.entries(F).forEach(([mk, f]) => {
@@ -137,8 +140,8 @@ function dayCands(F, G, key) {
     Object.values(f.legs).forEach(l => {
       if (l.st !== 'open' || l.safeZe) return;
       const t0 = new Date(l.d).getTime(); if (!(t0 > now + 10 * 60e3) || dayOf(l.d) !== key) return;
-      const J = judge(G, mk, l);
-      out.push(Object.assign({}, l, J, { mi: mk, M: MI[mk], why: J.weak ? 'zona fraca: este Mister falha aqui mais do que promete' : J.pb < CFG.minLeg ? `abaixo de ${pct(CFG.minLeg)} depois do filtro` : null }));
+      const J = judge(G, mk, l), old = f.t && now - f.t > STALE_H * 3600e3;
+      out.push(Object.assign({}, l, J, { mi: mk, M: MI[mk], why: old ? `dados do ${MI[mk].n} com mais de ${STALE_H} h: toca em ↻ para atualizar` : J.weak ? 'zona fraca: este Mister falha aqui mais do que promete' : J.pb < CFG.minLeg ? `abaixo de ${pct(CFG.minLeg)} depois do filtro` : null }));
     });
   });
   return out.sort((a, b) => b.pb - a.pb);
@@ -158,10 +161,12 @@ function buildSlip(C) {
 }
 /* registo dos boletins do Boss (fica congelado quando começa o 1.º jogo) e das seleções que cortou */
 let SLIPS = LS.get('slips', {}), CUTS = LS.get('cuts', {});
+const LOCK_MIN = 15;
+const slipLocked = d => { const s = SLIPS[d]; return !!(s && (s.played || s.legs.some(l => new Date(l.d).getTime() <= Date.now() + LOCK_MIN * 60e3))); };
+function playSlip(d, on) { const s = SLIPS[d]; if (!s) return; if (on) s.played = Date.now(); else delete s.played; LS.set('slips', SLIPS); }
 function snapshot(C, S, d) {
-  const old = SLIPS[d], now = Date.now();
-  const started = old && old.legs.some(l => new Date(l.d).getTime() <= now);
-  if (!started && S.legs.length) SLIPS[d] = { t: now, p: r3(S.p), legs: S.legs.map(c => ({ mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), odd: c.odd, est: c.est })) };
+  const now = Date.now();
+  if (!slipLocked(d) && S.legs.length) SLIPS[d] = { t: now, p: r3(S.p), legs: S.legs.map(c => ({ mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), odd: c.odd, est: c.est })) };
   C.filter(c => c.why).forEach(c => { const k = c.mi + '|' + c.id; if (!CUTS[k]) CUTS[k] = { mi: c.mi, id: c.id, lb: c.lb, gl: c.gl, d: c.d, p: c.p, pb: r3(c.pb), why: c.why, t: now }; });
   const ks = Object.keys(CUTS); if (ks.length > 600) ks.sort((a, b) => CUTS[a].t - CUTS[b].t).slice(0, ks.length - 600).forEach(k => delete CUTS[k]);
   const ss = Object.keys(SLIPS).sort(); if (ss.length > 200) ss.slice(0, ss.length - 200).forEach(k => delete SLIPS[k]);
@@ -257,7 +262,9 @@ function bossStats(F) {
   const S = Object.values(SLIPS).map(s => Object.assign({ r: slipResult(F, s) }, s)).filter(s => s.r.st !== 'open');
   const legs = []; Object.values(SLIPS).forEach(s => s.legs.forEach(l => { const st = legSt(F, l.mi, l.id); if (st === 'won' || st === 'lost') legs.push({ pb: l.pb, w: st === 'won' }); }));
   const cuts = Object.values(CUTS).map(c => ({ c, st: legSt(F, c.mi, c.id) })).filter(x => x.st === 'won' || x.st === 'lost');
-  return { slips: S.length, won: S.filter(s => s.r.st === 'won').length, prom: S.length ? S.reduce((a, s) => a + s.p, 0) / S.length : null,
+  const Pl = S.filter(s => s.played);
+  return { played: Pl.length, playedW: Pl.filter(s => s.r.st === 'won').length, playedP: Pl.length ? Pl.reduce((a, s) => a + s.p, 0) / Pl.length : null,
+    slips: S.length, won: S.filter(s => s.r.st === 'won').length, prom: S.length ? S.reduce((a, s) => a + s.p, 0) / S.length : null,
     legs: legs.length, legW: legs.filter(l => l.w).length, legP: legs.length ? legs.reduce((a, l) => a + l.pb, 0) / legs.length : null,
     cuts: cuts.length, cutLost: cuts.filter(x => x.st === 'lost').length, cutP: cuts.length ? cuts.reduce((a, x) => a + x.c.p, 0) / cuts.length : null };
 }
