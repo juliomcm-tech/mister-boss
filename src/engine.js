@@ -7,7 +7,7 @@
    «Boletim do Boss» com o melhor do dia de todos os desportos.
    Não mexe em nenhum Mister: só lê o que eles guardam.
    ===================================================================== */
-const APP_VER = '1.5.0';
+const APP_VER = '1.5.1';
 
 /* ---------- utilitários ---------- */
 const $ = s => document.querySelector(s);
@@ -160,7 +160,7 @@ function dayCands(F, G, key) {
   Object.entries(F).forEach(([mk, f]) => {
     if (CFG.off[mk]) return;
     Object.values(f.legs).forEach(l => {
-      if (l.st !== 'open' || l.safeZe) return;
+      if (l.st !== 'open' || l.safeZe || /\bTBD\b/i.test((l.gl || '') + ' ' + (l.lb || ''))) return;   // jogo com jogadores ainda por definir
       const t0 = new Date(l.d).getTime(); if (!(t0 > now + 10 * 60e3) || dayOf(l.d) !== key) return;
       const J = judge(G, mk, l), old = f.t && now - f.t > STALE_H * 3600e3;
       out.push(Object.assign({}, l, J, { mi: mk, M: MI[mk], why: old ? `dados do ${MI[mk].n} com mais de ${STALE_H} h: toca em ↻ para atualizar` : J.weak ? 'zona fraca: este Mister falha aqui mais do que promete' : J.pb < CFG.minLeg ? `abaixo de ${pct(CFG.minLeg)} depois do filtro` : null }));
